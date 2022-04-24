@@ -39,10 +39,21 @@ public class Esp32DeviceConnectionEditor : Editor
         EditorGUILayout.PrefixLabel("Time since last event");
         EditorGUILayout.LabelField(espTarget.timeSinceLastEvent >= 0 ? $"{espTarget.timeSinceLastEvent:0.0}s" : "no events received");
         GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        EditorGUILayout.PrefixLabel(" ");
+        if (GUILayout.Button("Connect"))
+        {
+            espTarget.gameObject.SetActive(false);
+            espTarget.gameObject.SetActive(true);
+            espTarget.SendIpNow();
+        }
+
+        GUILayout.EndHorizontal();
         
         if(isConnected)
         {
             EditorGUILayout.Space();
+            GUI.enabled = false;
             EditorGUILayout.LabelField("Device Info", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             EditorGUILayout.LabelField("Device Name", espTarget.deviceInfo.name);
@@ -62,19 +73,10 @@ public class Esp32DeviceConnectionEditor : Editor
             GUILayout.EndHorizontal();
             
             EditorGUILayout.LabelField("Has Motor", $"{espTarget.deviceInfo.hasMotor}");
+            GUI.enabled = true;
             EditorGUI.indentLevel--;
         }
 
-        GUILayout.BeginHorizontal();
-        EditorGUILayout.PrefixLabel(" ");
-        if (GUILayout.Button("Connect"))
-        {
-            espTarget.gameObject.SetActive(false);
-            espTarget.gameObject.SetActive(true);
-            espTarget.SendIpNow();
-        }
-
-        GUILayout.EndHorizontal();
         
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("","Input",EditorStyles.boldLabel);

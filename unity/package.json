@@ -9,6 +9,11 @@
     "esp32",
     "arduino"
   ],
+  "author": {
+    "name": "ECAL MID",
+    "email": "",
+    "url": "https://github.com/ecal-mid"
+  },
   "dependencies": {
     "jp.keijiro.osc-jack": "1.0.3"
   },

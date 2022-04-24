@@ -20,31 +20,18 @@ public class Esp32DeviceConnectionEditor : Editor
         base.OnInspectorGUI();
         var espTarget = (target as Esp32DeviceConnection);
         
-        EditorGUILayout.LabelField("Local IP",espTarget.serverAddress);
-        EditorGUILayout.LabelField("Server Port",espTarget.serverPort.ToString());
+        EditorGUILayout.LabelField("Server (Local) Address",espTarget.serverAddress);
+        EditorGUILayout.LabelField("Server (Local) Port",espTarget.serverPort.ToString());
 
-
-        var state = "";
-        var isActive = espTarget.timeSinceLastEvent >= 0;
-        var color = Color.white;
-        if (isActive)
-        {
-            color = new Color(.0f,1,.0f);
-            state = "connected";
-        }
-        else
-        {
-            color = new Color(1f, .0f, .0f);
-            state = "not connected";
-        }
+        var isConnected = espTarget.timeSinceLastEvent >= 0;
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("","Connection",EditorStyles.boldLabel);
 
         GUILayout.BeginHorizontal();
         EditorGUILayout.PrefixLabel("State");
         var prevColor = GUI.color;
-        GUI.color = color;
-        EditorGUILayout.LabelField(state,EditorStyles.boldLabel);
+        GUI.color = isConnected ?  new Color(.0f,1,.0f) :   new Color(1f, .0f, .0f);
+        EditorGUILayout.LabelField(isConnected ? "connected" : "disconnected",EditorStyles.boldLabel);
         GUILayout.EndHorizontal();
         GUI.color = prevColor;
         
@@ -52,7 +39,31 @@ public class Esp32DeviceConnectionEditor : Editor
         EditorGUILayout.PrefixLabel("Time since last event");
         EditorGUILayout.LabelField(espTarget.timeSinceLastEvent >= 0 ? $"{espTarget.timeSinceLastEvent:0.0}s" : "no events received");
         GUILayout.EndHorizontal();
+        
+        if(isConnected)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Device Info", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
+            EditorGUILayout.LabelField("Device Name", espTarget.deviceInfo.name);
+            EditorGUILayout.LabelField("Firmware Version", $"{espTarget.deviceInfo.firmwareVersion}");
+            EditorGUILayout.LabelField("Battery Voltage", $"{espTarget.deviceInfo.batteryVoltage:0.0}V");
             
+            GUILayout.BeginHorizontal();
+            {
+                EditorGUILayout.PrefixLabel("Battery Level");
+                var prevColor2 = GUI.color;
+                GUI.color = espTarget.deviceInfo.batteryLevel > 0.2f ? (espTarget.deviceInfo.batteryLevel > 0.5f ? new Color(.0f, 1, .0f) : new Color(1f, 1f, .0f)) : new Color(1f, .0f, .0f);
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField($"{Mathf.RoundToInt(espTarget.deviceInfo.batteryLevel * 100)}%");
+                EditorGUI.indentLevel++;
+                GUI.color = prevColor2;
+            }
+            GUILayout.EndHorizontal();
+            
+            EditorGUILayout.LabelField("Has Motor", $"{espTarget.deviceInfo.hasMotor}");
+            EditorGUI.indentLevel--;
+        }
 
         GUILayout.BeginHorizontal();
         EditorGUILayout.PrefixLabel(" ");
@@ -65,8 +76,6 @@ public class Esp32DeviceConnectionEditor : Editor
 
         GUILayout.EndHorizontal();
         
-        EditorGUILayout.Separator();
-        EditorGUILayout.LabelField("","Debug ",EditorStyles.largeLabel);
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("","Input",EditorStyles.boldLabel);
         EditorGUILayout.LabelField("Button:",espTarget.currentState.button ? "down" : "up",EditorStyles.boldLabel);

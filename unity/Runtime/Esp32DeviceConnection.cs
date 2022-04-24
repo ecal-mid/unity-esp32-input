@@ -15,6 +15,20 @@ using UnityEngine.InputSystem.LowLevel;
 [ExecuteAlways]
 public class Esp32DeviceConnection : MonoBehaviour
 {
+	public struct ESP32DeviceInfo
+	{
+		public string name;
+		public int firmwareVersion;
+		public float batteryVoltage;
+		public float batteryLevel;
+		public bool hasMotor;
+
+		public override string ToString()
+		{
+			return $"{nameof(name)}: {name}, {nameof(firmwareVersion)}: {firmwareVersion}, {nameof(batteryLevel)}: {batteryLevel}, {nameof(hasMotor)}: {hasMotor}";
+		}
+	}
+
 	public struct InputState
 	{
 		public float encoder;
@@ -38,79 +52,38 @@ public class Esp32DeviceConnection : MonoBehaviour
 
 	Queue<InputState> dataQueue = new Queue<InputState>();
 
-	public float timeSinceLastEvent { get; private set; } = -1;
-	public float timeSinceLastIpSend { get; private set; } = 999;
-	public float timeSinceLastHeartbeat { get; private set; } = 999;
+	public float timeSinceLastEvent { get; private set; }
+	public float timeSinceLastIpSend { get; private set; }
+	public float timeSinceLastHeartbeat { get; private set; }
 
 	public bool ipAutoSendEnabled => !Application.isEditor;
-	public float ipSendInterval = 5;
-	public float heartbeatInterval = 5;
+	float ipSendInterval = 5;
+	float heartbeatInterval = 5;
 
 	public bool initialized { get; private set; }
 
+	public ESP32DeviceInfo deviceInfo;
 	public InputState currentState { get; private set; }
 
 #if UNITY_INPUT_SYSTEM
 	public Esp32Device inputDevice { get; private set; }
 #endif
 
-	private bool firstEncoderValueReceived;
-	private float zeroEncoderValue;
+	bool firstEncoderValueReceived;
+	float zeroEncoderValue;
 
-	void OnEnable()
+	void ResetState()
 	{
-		// IN
-		serverPort = serverMinPort;
-		while (serverPort < serverMaxPort)
-		{
-			try
-			{
-				_server = new OscServer(serverPort); // Port number
-				break;
-			}
-			catch
-			{
-			}
-
-			serverPort++;
-		}
-
-		if (_server == null)
-			throw new UnityException($"No free server port found in range {serverMinPort}-{serverMaxPort}");
-
-		_server.MessageDispatcher.AddCallback("/unity/state/", OnDataReceiveState);
-		_server.MessageDispatcher.AddCallback("/unity/ipupdated/", OnDataReceiveIp);
-
-		// OUT
-		_client = new OscClient(clientAddress, clientPort);
-
-		// start update ip loop
-		serverAddress = GetLocalAddress();
-
-#if UNITY_INPUT_SYSTEM
-		inputDevice = InputSystem.AddDevice(new InputDeviceDescription
-		{
-			interfaceName = "ESP32",
-			product = "Input Thing",
-			version = "1",
-			deviceClass = "box",
-			manufacturer = "ecal",
-			capabilities = "encoder,button,motor",
-			serial = $"{clientAddress}:{clientPort}@{serverPort}",
-		}) as Esp32Device;
-		
-		InputSystem.EnableDevice(inputDevice);
-
-		AddCommandListener();
-#endif
-
-		initialized = true;
-	}
-
-
-	void OnDisable()
-	{
+		timeSinceLastEvent = -1;
+		timeSinceLastIpSend = 999;
+		timeSinceLastHeartbeat = 999;
 		serverPort = -1;
+		initialized = false;
+		firstEncoderValueReceived = false;
+		dataQueue.Clear();
+		serverPort = 0;
+		serverAddress = null;
+
 
 #if UNITY_INPUT_SYSTEM
 		if (inputDevice != null)
@@ -134,9 +107,67 @@ public class Esp32DeviceConnection : MonoBehaviour
 			_client = null;
 		}
 
-		initialized = false;
+	}
 
-		firstEncoderValueReceived = false;
+	void Awake()
+	{
+		ResetState();
+	}
+
+	void OnEnable()
+	{
+		// IN
+		serverPort = serverMinPort;
+		while (serverPort < serverMaxPort)
+		{
+			try
+			{
+				_server = new OscServer(serverPort); // Port number
+				break;
+			}
+			catch
+			{
+			}
+
+			serverPort++;
+		}
+
+		if (_server == null)
+			throw new UnityException($"No free server port found in range {serverMinPort}-{serverMaxPort}");
+
+		_server.MessageDispatcher.AddCallback("/unity/state/", OnDataReceiveState);
+		_server.MessageDispatcher.AddCallback("/unity/info/", OnDataReceiveInfo);
+
+		// OUT
+		_client = new OscClient(clientAddress, clientPort);
+
+		// start update ip loop
+		serverAddress = GetLocalAddress();
+
+#if UNITY_INPUT_SYSTEM
+		inputDevice = InputSystem.AddDevice(new InputDeviceDescription
+		{
+			interfaceName = "ESP32",
+			product = "Input Thing",
+			version = "1",
+			deviceClass = "box",
+			manufacturer = "ecal",
+			capabilities = "encoder,button,motor",
+			serial = $"{clientAddress}:{clientPort}@{serverPort}",
+		}) as Esp32Device;
+
+		InputSystem.EnableDevice(inputDevice);
+
+		AddCommandListener();
+#endif
+
+		initialized = true;
+	}
+
+
+	void OnDisable()
+	{
+		ResetState();
 	}
 
 
@@ -168,7 +199,7 @@ public class Esp32DeviceConnection : MonoBehaviour
 				timeSinceLastIpSend = 0;
 			}
 		}
-		
+
 		timeSinceLastHeartbeat += Time.deltaTime;
 		if (timeSinceLastHeartbeat > heartbeatInterval)
 		{
@@ -200,8 +231,19 @@ public class Esp32DeviceConnection : MonoBehaviour
 	}
 
 
-	void OnDataReceiveIp(string address, OscDataHandle data)
+	void OnDataReceiveInfo(string address, OscDataHandle data)
 	{
+		var minVoltage = 3.6f;
+		var maxVoltage = 4.2f;
+		deviceInfo = new ESP32DeviceInfo
+		{
+			name = data.GetElementAsString(0),
+			firmwareVersion = data.GetElementAsInt(1),
+			batteryVoltage =  data.GetElementAsFloat(2),
+			batteryLevel = Mathf.InverseLerp(minVoltage,maxVoltage, data.GetElementAsFloat(2) ),
+			hasMotor = data.GetElementAsInt(3) == 1,
+		};
+
 		timeSinceLastEvent = 0;
 	}
 

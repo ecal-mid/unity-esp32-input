@@ -19,6 +19,7 @@
 #include <Wire.h>
 #include "Adafruit_DRV2605.h"
 #include <ESP32Encoder.h>
+#include <Preferences.h>
 
 int firmware = 30;
 
@@ -33,6 +34,7 @@ bool authorisedIP = false;
 
 
 OSCErrorCode error;
+Preferences preferences; // to save persistent data (board name)
 
 String boardName; // to be used as identifier and MDNS
 float batteryVotage = 0;
@@ -68,6 +70,8 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("");
+  preferences.begin("device", false);
+  //setBoardName(1);
   // DRV2605
   Serial.println("Starting DRV2605");
   if (drv.begin()) {
@@ -107,11 +111,14 @@ void loop() {
     // start deepSleep
     goToSleep();
   }
-  /* --------- Send battery and other info every minutes */
+  /* --------- Send battery and other info every minutes and check wifi connection */
   if (millis() - lastInfoSentMillis > 60 * 1000) {
     // send info
     outSendInfo();
     lastInfoSentMillis = millis();
+    if (WiFi.status() != WL_CONNECTED){
+      
+    }
   }
   /* --------- SEND OSC MSGS */
   // ENCODER
@@ -168,6 +175,7 @@ void loop() {
         msg.dispatch("/arduino/keepalive", inKeepAlive);
       }
       // pass trough access to allow update of outgoing Port and IP
+      msg.dispatch("/arduino/setname", inSetName);
       msg.dispatch("/arduino/updateip", inUpdateIp);
     } else {
       error = msg.getError();
@@ -194,10 +202,12 @@ void outSendValues() { // in button, encoder
 
 void outSendInfo() {
   OSCMessage msg("/unity/info/");
-  msg.add("x");
+  char brd_name[12];
+  getBoardName().toCharArray(brd_name, 12);
+  msg.add(brd_name);
   msg.add(firmware);
   msg.add(getBatteryLevel());
-  msg.add(hasMotor);
+  msg.add(int(hasMotor));
   Udp.beginPacket(outIp, outPort);
   msg.send(Udp);
   Udp.endPacket();
@@ -241,12 +251,13 @@ void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
   Serial.println(outPort);
 
   // answer
-  OSCMessage answer("/unity/ipupdated/");
+  outSendInfo();
+  /*OSCMessage answer("/unity/ipupdated/");
   answer.add(1);
   Udp.beginPacket(outIp, outPort);
   answer.send(Udp);
   Udp.endPacket();
-  answer.empty();
+  answer.empty();*/
 }
 
 void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
@@ -256,6 +267,10 @@ void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0
 
 void inRestartESP(OSCMessage &msg) { // no value needed
   restartESP();
+}
+
+void inSetName(OSCMessage &msg) { // int (will be used a unique identifier number)
+  setBoardName(msg.getInt(0));
 }
 
 
@@ -304,10 +319,16 @@ void startWifiAndUdp() {
   MDNS.addServiceTxt("osc", "udp", "board", "ESP32Board");
 }
 
+void setBoardName(int nbr){
+  preferences.putInt("name", nbr);
+}
+
 String getBoardName() {
-  String board_name = WiFi.macAddress();
-  board_name.replace(":", "");
-  board_name = "magic" + board_name.substring(0, 7);
+  int nbr = preferences.getInt("name", 0);
+  String board_name = "controller"+String(nbr);
+  //String board_name = WiFi.macAddress();
+  //board_name.replace(":", "");
+  //board_name = "magic" + board_name.substring(0, 7);
   return board_name;
 }
 

@@ -1,0 +1,16 @@
+{
+  "name": "ch.ecal.esp32-input",
+  "displayName": "ESP32 Input",
+  "version": "0.1.0",
+  "unity": "2020.3",
+  "description": "ESP32 Input for Unity via OSC",
+  "keywords": [
+    "osc",
+    "esp32",
+    "arduino"
+  ],
+  "dependencies": {
+    "jp.keijiro.osc-jack": "1.0.3"
+  },
+  "type": "library"
+}

@@ -1,0 +1,19 @@
+{
+    "name": "ESP32Input.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:abfc08fc36d3c87488bb0da5377f22da",
+        "GUID:75469ad4d38634e559750d17036d5f7c"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

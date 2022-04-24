@@ -40,6 +40,11 @@ public class Esp32DeviceConnection : MonoBehaviour
 
 	public float timeSinceLastEvent { get; private set; } = -1;
 	public float timeSinceLastIpSend { get; private set; } = 999;
+	public float timeSinceLastHeartbeat { get; private set; } = 999;
+
+	public bool ipAutoSendEnabled => !Application.isEditor;
+	public float ipSendInterval = 5;
+	public float heartbeatInterval = 5;
 
 	public bool initialized { get; private set; }
 
@@ -154,14 +159,21 @@ public class Esp32DeviceConnection : MonoBehaviour
 		if (timeSinceLastEvent >= 0)
 			timeSinceLastEvent += Time.deltaTime;
 
-		if (!Application.isEditor)
+		if (ipAutoSendEnabled)
 		{
 			timeSinceLastIpSend += Time.deltaTime;
-			if (timeSinceLastIpSend > 5)
+			if (timeSinceLastIpSend > ipSendInterval)
 			{
 				SendIpNow();
 				timeSinceLastIpSend = 0;
 			}
+		}
+		
+		timeSinceLastHeartbeat += Time.deltaTime;
+		if (timeSinceLastHeartbeat > heartbeatInterval)
+		{
+			SendHeartbeat();
+			timeSinceLastHeartbeat = 0;
 		}
 	}
 
@@ -191,6 +203,11 @@ public class Esp32DeviceConnection : MonoBehaviour
 	void OnDataReceiveIp(string address, OscDataHandle data)
 	{
 		timeSinceLastEvent = 0;
+	}
+
+	public void SendHeartbeat()
+	{
+		_client.Send("/arduino/keepalive", 0);
 	}
 
 	public void SendIpNow()

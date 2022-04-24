@@ -53,7 +53,6 @@ public class Esp32DeviceConnectionEditor : Editor
         if(isConnected)
         {
             EditorGUILayout.Space();
-            GUI.enabled = false;
             EditorGUILayout.LabelField("Device Info", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             EditorGUILayout.LabelField("Device Name", espTarget.deviceInfo.name);
@@ -73,7 +72,6 @@ public class Esp32DeviceConnectionEditor : Editor
             GUILayout.EndHorizontal();
             
             EditorGUILayout.LabelField("Has Motor", $"{espTarget.deviceInfo.hasMotor}");
-            GUI.enabled = true;
             EditorGUI.indentLevel--;
         }
 

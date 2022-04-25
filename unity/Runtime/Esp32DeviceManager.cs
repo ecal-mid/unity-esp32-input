@@ -59,7 +59,7 @@ public class Esp32DeviceManager : MonoBehaviour
 
 	void AddDevice(Esp32ClientConnectionSettings settings)
 	{
-		var device = new Esp32Device(settings.address, settings.port, server);
+		var device = new Esp32Device(settings, server);
 		devices.Add(device);
 		
 		OnDeviceAdded?.Invoke(device);

@@ -36,7 +36,7 @@ public class Esp32DeviceManagerEditor : Editor
 		string[] options = new string [connectionManager.devices.Count];
 		for (int i = 0; i < connectionManager.devices.Count; i++)
 		{
-			options[i] = connectionManager.devices[i].client.address;
+			options[i] = $"{connectionManager.devices[i].name} ({connectionManager.devices[i].client.address})";
 		}
  
 		var selectedId = EditorGUILayout.Popup(connectionManager.devices.IndexOf(activeDevice), options);

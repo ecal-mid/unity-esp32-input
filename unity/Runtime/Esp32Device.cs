@@ -23,14 +23,16 @@ public class Esp32Device : IDisposable
 	float heartbeatInterval = 5;
 	bool firstEncoderValueReceived = false;
 	float zeroEncoderValue;
+	public string name;
 
 	public Esp32Client client { get; private set; }
 	public Esp32Server server { get; private set; }
 	public bool IsDisposed { get;private set; }
 
-	public Esp32Device(string address, int port, Esp32Server espServer)
+	public Esp32Device(Esp32ClientConnectionSettings settings, Esp32Server espServer)
 	{
-		client = new Esp32Client(address,port);
+		name = settings.name;
+		client = new Esp32Client(settings.address,settings.port);
 		
 		server = espServer;
 		server.OnInfo += OnInfo;

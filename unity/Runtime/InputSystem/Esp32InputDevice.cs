@@ -13,11 +13,11 @@ using UnityEditor;
 [InitializeOnLoad] // Call static class constructor in editor.
 #endif
 [InputControlLayout(stateType = typeof(Esp32DeviceState))]
-public class Esp32Device : InputDevice//, IInputStateCallbackReceiver
+public class Esp32InputDevice : InputDevice//, IInputStateCallbackReceiver
 {
     
 #if UNITY_EDITOR
-    static Esp32Device()
+    static Esp32InputDevice()
     {
         Initialize();
     }
@@ -26,7 +26,7 @@ public class Esp32Device : InputDevice//, IInputStateCallbackReceiver
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Initialize()
     {
-        InputSystem.RegisterLayout<Esp32Device>(
+        InputSystem.RegisterLayout<Esp32InputDevice>(
             matches: new InputDeviceMatcher()
                 .WithInterface("ESP32"));
     }

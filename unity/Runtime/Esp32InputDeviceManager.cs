@@ -7,13 +7,13 @@ using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.LowLevel;
 
 [DefaultExecutionOrder(-9)]
-public class Esp32DeviceManager : MonoBehaviour
+public class Esp32InputDeviceManager : MonoBehaviour
 {
-	public Dictionary<Esp32Device, Esp32DeviceConnection> inputDevices = new Dictionary<Esp32Device, Esp32DeviceConnection>();
+	public Dictionary<Esp32InputDevice, Esp32Device> inputDevices = new Dictionary<Esp32InputDevice, Esp32Device>();
 
 	void OnEnable()
 	{
-		var connections = new List<Esp32DeviceConnection>(FindObjectsOfType<Esp32DeviceConnection>());
+		var connections = new List<Esp32Device>(FindObjectsOfType<Esp32Device>());
 		connections.Sort((a, b) => a.name.CompareTo(b.name));
 		for (int i = 0; i < connections.Count; i++)
 		{
@@ -26,8 +26,8 @@ public class Esp32DeviceManager : MonoBehaviour
 				deviceClass = "box",
 				manufacturer = "ecal",
 				capabilities = "encoder,button,motor",
-				serial = $"{conn.clientAddress}:{conn.clientPort}@{conn.serverPort}",
-			}) as Esp32Device;
+				serial = $"{conn.client.address}:{conn.client.port}@{conn.server.port}",
+			}) as Esp32InputDevice;
 			InputSystem.EnableDevice(inputDevice);
 
 			inputDevices.Add(inputDevice, conn);
@@ -73,22 +73,22 @@ public class Esp32DeviceManager : MonoBehaviour
 
 	private unsafe long? OnDeviceCommand(InputDevice commandDevice, InputDeviceCommand* command)
 	{
-		if (commandDevice is Esp32Device device)
+		if (commandDevice is Esp32InputDevice device)
 		{
 			if (inputDevices.ContainsKey(device))
 			{
-				var connection = inputDevices[device];
+				var mainDevice = inputDevices[device];
 				if (command->type == Esp32HapticEventCommand.Type)
 				{
 					var cmd = (Esp32HapticEventCommand*)command;
-					connection.SendHapticEvent(cmd->eventId);
+					mainDevice.SendHapticEvent(cmd->eventId);
 					return 0;
 				}
 
 				if (command->type == Esp32HapticRealtimeCommand.Type)
 				{
 					var cmd = (Esp32HapticRealtimeCommand*)command;
-					connection.SendMotorSpeed(cmd->speed);
+					mainDevice.SendMotorSpeed(cmd->speed);
 					return 0;
 				}
 			}

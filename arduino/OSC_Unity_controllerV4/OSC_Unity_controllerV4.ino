@@ -21,7 +21,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 31;
+int firmware = 33;
 
 char ssid[] = WIFI_SSID;                    // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -31,7 +31,7 @@ IPAddress outIp(192, 168, 0, 0);            // remote IP of your computer
 int outPort = 8888;                         // remote port to send OSC
 const unsigned int localPort = 9999;        // local port to listen for OSC packets
 bool authorisedIP = false;
-
+IPAddress lastOutIp(192, 168, 0, 0);
 
 OSCErrorCode error;
 Preferences preferences; // to save persistent data (board name)
@@ -111,7 +111,7 @@ void loop() {
     // start deepSleep
     goToSleep();
   }
-  
+
   /* --------- Send battery level and other info every minutes and check wifi connection */
   if (millis() - lastInfoSentMillis > 60 * 1000) {
     // send info
@@ -122,7 +122,7 @@ void loop() {
       restartESP();
     }
   }
-  
+
   /* --------- SEND OSC MSGS */
   // ENCODER
   // read the state of the Encoder
@@ -176,10 +176,11 @@ void loop() {
         msg.dispatch("/arduino/motor/cmd", inMotorCommand);
         msg.dispatch("/arduino/restart", inRestartESP);
         msg.dispatch("/arduino/keepalive", inKeepAlive);
+        msg.dispatch("/arduino/disconnect", inDisconnect);
       }
       // pass trough access to allow update of outgoing Port and IP
       msg.dispatch("/arduino/setname", inSetName);
-      msg.dispatch("/arduino/updateip", inUpdateIp);
+      msg.dispatch("/arduino/connect", inConnect);
     } else {
       error = msg.getError();
       Serial.print("error: ");
@@ -194,6 +195,11 @@ void loop() {
 /* --------- OUTGOING OSC COMMANDS FUNCTIONS ------------ */
 void outSendValues() { // in button, encoder
   OSCMessage msg("/unity/state/");
+  char brd_name[12];
+  char ip_char[15];
+  getBoardName().toCharArray(brd_name, 12);
+  WiFi.localIP().toString().toCharArray(ip_char, 15);
+  msg.add(ip_char);
   msg.add(buttonState);
   msg.add(encoderCount);
   Udp.beginPacket(outIp, outPort);
@@ -206,7 +212,10 @@ void outSendValues() { // in button, encoder
 void outSendInfo() {
   OSCMessage msg("/unity/info/");
   char brd_name[12];
+  char ip_char[15];
   getBoardName().toCharArray(brd_name, 12);
+  WiFi.localIP().toString().toCharArray(ip_char, 15);
+  msg.add(ip_char);
   msg.add(brd_name);
   msg.add(firmware);
   msg.add(getBatteryLevel());
@@ -216,6 +225,19 @@ void outSendInfo() {
   Udp.endPacket();
   msg.empty();
   delay (10);
+}
+
+void outSendDisconnect() {
+  OSCMessage msg("/unity/disconnect/");
+  char ip_char[15];
+  WiFi.localIP().toString().toCharArray(ip_char, 15);
+  msg.add(ip_char);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+  delay (10);
+  Serial.println("disconnect sent");
 }
 
 /* --------- INCOMMING OSC COMMANDS FUNCTIONS ------------ */
@@ -235,7 +257,7 @@ void inMotorCommand(OSCMessage &msg) { // int value 0-117
   playHaptic(motorCommand);
 }
 
-void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
+void inConnect(OSCMessage &msg) { // string value "ip:port"
   char newIpAndPort[20];
   int str_length = msg.getString(0, newIpAndPort, 20);
   String ipAndportString = String(newIpAndPort);
@@ -244,6 +266,10 @@ void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
   String ipString = ipAndportString.substring(0, colonPos);
   String PortString = ipAndportString.substring(colonPos + 1, ipAndportString.length());
 
+  if (outIp.toString() != ipString) {
+    // send disconnect to last IP
+    outSendDisconnect();
+  }
 
   outIp.fromString(ipString);
   outPort = PortString.toInt();
@@ -252,15 +278,13 @@ void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
   Serial.println(outIp);
   Serial.print("New remote Port: ");
   Serial.println(outPort);
-
   // answer
   outSendInfo();
-  /*OSCMessage answer("/unity/ipupdated/");
-    answer.add(1);
-    Udp.beginPacket(outIp, outPort);
-    answer.send(Udp);
-    Udp.endPacket();
-    answer.empty();*/
+}
+
+void inDisconnect(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
+  outIp.fromString("192.168.0.0");
+  Serial.println("distant Host disconnected");
 }
 
 void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change

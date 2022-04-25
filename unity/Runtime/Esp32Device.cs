@@ -1,70 +1,49 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
 using UnityEngine;
-using OscJack;
-using Unity.Collections;
-#if UNITY_INPUT_SYSTEM
-#endif
 
-[ExecuteAlways]
-[DefaultExecutionOrder(-10)]
-public class Esp32Device : MonoBehaviour
+[Serializable]
+public class Esp32Device : IDisposable
 {
-	public string address;
-	public int port = 8888;
 
 	Queue<Esp32Event<Esp32InputState>> oscEventQueue = new Queue<Esp32Event<Esp32InputState>>();
 	public List<Esp32InputState> eventsList { get; } = new List<Esp32InputState>();
 
-	public float timeSinceLastEvent { get; private set; }
-	public float timeSinceLastIpSend { get; private set; }
-	public float timeSinceLastHeartbeat { get; private set; }
+	public float timeSinceLastEvent { get; private set; }= -1;
+	public float timeSinceLastIpSend { get; private set; } = 999;
+	public float timeSinceLastHeartbeat { get; private set; }= 999;
 
 	public bool ipAutoSendEnabled => !Application.isEditor;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
 	public Esp32InputState currentState { get; private set; }
 
-	public Esp32OscConnectionManager connectionManager;
 
 	float ipSendInterval = 5;
 	float heartbeatInterval = 5;
-	bool firstEncoderValueReceived;
+	bool firstEncoderValueReceived = false;
 	float zeroEncoderValue;
 
 	public Esp32Client client { get; private set; }
 	public Esp32Server server { get; private set; }
+	public bool IsDisposed { get;private set; }
 
-	void ResetState()
+	public Esp32Device(string address, int port, Esp32Server espServer)
 	{
-		timeSinceLastEvent = -1;
-		timeSinceLastIpSend = 999;
-		timeSinceLastHeartbeat = 999;
-		firstEncoderValueReceived = false;
-	}
-
-	void Awake()
-	{
-		ResetState();
-	}
-
-	void OnEnable()
-	{
-		client = connectionManager.AddClient(address, port);
-		server = connectionManager.server;
+		client = new Esp32Client(address,port);
+		
+		server = espServer;
 		server.OnInfo += OnInfo;
 		server.OnInput += OnInput;
 	}
 
 
-	void OnDisable()
+	public void Dispose()
 	{
+		
 		if (client != null)
 		{
-			connectionManager.RemoveClient(client);
+			client.Dispose();
 			client = null;
 		}
 
@@ -75,14 +54,13 @@ public class Esp32Device : MonoBehaviour
 			server.OnInput -= OnInput;
 			server = null;
 		}
-		
-		oscEventQueue.Clear();
 
-		ResetState();
+		IsDisposed = true;
 	}
 
-	void Update()
+	public void Update()
 	{
+		eventsList.Clear();
 		lock (oscEventQueue)
 		{
 			while (oscEventQueue.Count > 0)
@@ -126,15 +104,9 @@ public class Esp32Device : MonoBehaviour
 			timeSinceLastHeartbeat = 0;
 		}
 	}
-
-	void LateUpdate()
-	{
-		eventsList.Clear();
-	}
-
 	void OnInput(Esp32Event<Esp32InputState> evt)
 	{
-		if (evt.senderAddress != address)
+		if (evt.senderAddress != client.address)
 			return;
 
 		lock (oscEventQueue)
@@ -145,7 +117,7 @@ public class Esp32Device : MonoBehaviour
 
 	void OnInfo(Esp32Event<ESP32DeviceInfo> evt)
 	{
-		if (evt.senderAddress != address)
+		if (evt.senderAddress != client.address)
 			return;
 		
 		deviceInfo = evt.data;

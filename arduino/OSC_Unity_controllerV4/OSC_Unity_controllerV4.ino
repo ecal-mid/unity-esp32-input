@@ -32,6 +32,7 @@ int outPort = 8888;                         // remote port to send OSC
 const unsigned int localPort = 9999;        // local port to listen for OSC packets
 bool authorisedIP = false;
 IPAddress lastOutIp(192, 168, 0, 0);
+char ipAsChar[15];
 
 OSCErrorCode error;
 Preferences preferences; // to save persistent data (board name)
@@ -196,10 +197,8 @@ void loop() {
 void outSendValues() { // in button, encoder
   OSCMessage msg("/unity/state/");
   char brd_name[12];
-  char ip_char[15];
   getBoardName().toCharArray(brd_name, 12);
-  WiFi.localIP().toString().toCharArray(ip_char, 15);
-  msg.add(ip_char);
+  msg.add(ipAsChar);
   msg.add(buttonState);
   msg.add(encoderCount);
   Udp.beginPacket(outIp, outPort);
@@ -212,10 +211,8 @@ void outSendValues() { // in button, encoder
 void outSendInfo() {
   OSCMessage msg("/unity/info/");
   char brd_name[12];
-  char ip_char[15];
   getBoardName().toCharArray(brd_name, 12);
-  WiFi.localIP().toString().toCharArray(ip_char, 15);
-  msg.add(ip_char);
+  msg.add(ipAsChar);
   msg.add(brd_name);
   msg.add(firmware);
   msg.add(getBatteryLevel());
@@ -229,9 +226,7 @@ void outSendInfo() {
 
 void outSendDisconnect() {
   OSCMessage msg("/unity/disconnect/");
-  char ip_char[15];
-  WiFi.localIP().toString().toCharArray(ip_char, 15);
-  msg.add(ip_char);
+  msg.add(ipAsChar);
   Udp.beginPacket(outIp, outPort);
   msg.send(Udp);
   Udp.endPacket();
@@ -273,6 +268,8 @@ void inConnect(OSCMessage &msg) { // string value "ip:port"
 
   outIp.fromString(ipString);
   outPort = PortString.toInt();
+  // save iP as Char Array for sending
+  WiFi.localIP().toString().toCharArray(ipAsChar, 15);
 
   Serial.print("New remote IP: ");
   Serial.println(outIp);
@@ -353,9 +350,6 @@ void setBoardName(int nbr) {
 String getBoardName() {
   int nbr = preferences.getInt("name", 0);
   String board_name = "controller" + String(nbr);
-  //String board_name = WiFi.macAddress();
-  //board_name.replace(":", "");
-  //board_name = "magic" + board_name.substring(0, 7);
   return board_name;
 }
 

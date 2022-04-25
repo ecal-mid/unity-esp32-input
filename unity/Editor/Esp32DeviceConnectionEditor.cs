@@ -115,7 +115,7 @@ public class Esp32DeviceConnectionEditor : Editor
         #if UNITY_INPUT_SYSTEM
         EditorGUILayout.Separator();
         EditorGUILayout.LabelField("Input System ",EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Device Path", espTarget.inputDevice != null ? espTarget.inputDevice.name : "(no device)",EditorStyles.boldLabel);
+       // EditorGUILayout.LabelField("Device Path", espTarget.inputDevice != null ? espTarget.inputDevice.name : "(no device)",EditorStyles.boldLabel);
         #endif
         UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
     }

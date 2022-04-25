@@ -7,12 +7,10 @@ using UnityEngine;
 using OscJack;
 using Unity.Collections;
 #if UNITY_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Layouts;
-using UnityEngine.InputSystem.LowLevel;
 #endif
 
 [ExecuteAlways]
+[DefaultExecutionOrder(-10)]
 public class Esp32DeviceConnection : MonoBehaviour
 {
 	public struct ESP32DeviceInfo
@@ -50,7 +48,9 @@ public class Esp32DeviceConnection : MonoBehaviour
 	OscServer _server; // IN
 	OscClient _client; // OUT
 
+
 	Queue<InputState> dataQueue = new Queue<InputState>();
+	public List<InputState> eventsList = new List<InputState>();
 
 	public float timeSinceLastEvent { get; private set; }
 	public float timeSinceLastIpSend { get; private set; }
@@ -65,9 +65,6 @@ public class Esp32DeviceConnection : MonoBehaviour
 	public ESP32DeviceInfo deviceInfo;
 	public InputState currentState { get; private set; }
 
-#if UNITY_INPUT_SYSTEM
-	public Esp32Device inputDevice { get; private set; }
-#endif
 
 	bool firstEncoderValueReceived;
 	float zeroEncoderValue;
@@ -84,16 +81,6 @@ public class Esp32DeviceConnection : MonoBehaviour
 		serverPort = 0;
 		serverAddress = null;
 
-
-#if UNITY_INPUT_SYSTEM
-		if (inputDevice != null)
-		{
-			InputSystem.RemoveDevice(inputDevice);
-			inputDevice = null;
-		}
-
-		RemoveCommandListener();
-#endif
 
 		if (_server != null)
 		{
@@ -144,22 +131,6 @@ public class Esp32DeviceConnection : MonoBehaviour
 		// start update ip loop
 		serverAddress = GetLocalAddress();
 
-#if UNITY_INPUT_SYSTEM
-		inputDevice = InputSystem.AddDevice(new InputDeviceDescription
-		{
-			interfaceName = "ESP32",
-			product = "Input Thing",
-			version = "1",
-			deviceClass = "box",
-			manufacturer = "ecal",
-			capabilities = "encoder,button,motor",
-			serial = $"{clientAddress}:{clientPort}@{serverPort}",
-		}) as Esp32Device;
-
-		InputSystem.EnableDevice(inputDevice);
-
-		AddCommandListener();
-#endif
 
 		initialized = true;
 	}
@@ -173,16 +144,15 @@ public class Esp32DeviceConnection : MonoBehaviour
 
 	void Update()
 	{
+		eventsList.Clear();
 		lock (dataQueue)
 		{
 			while (dataQueue.Count > 0)
 			{
 				var state = dataQueue.Dequeue();
 
-#if UNITY_INPUT_SYSTEM
-				InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevice, state);
-#endif
-
+				eventsList.Add(state);
+				
 				currentState = state;
 			}
 		}
@@ -275,64 +245,13 @@ public class Esp32DeviceConnection : MonoBehaviour
 
 		return address;
 	}
-#if UNITY_INPUT_SYSTEM
-	unsafe void AddCommandListener()
-	{
-		InputSystem.onDeviceCommand += OnDeviceCommand;
-	}
-
-	unsafe void RemoveCommandListener()
-	{
-		InputSystem.onDeviceCommand -= OnDeviceCommand;
-	}
-
-	private unsafe long? OnDeviceCommand(InputDevice commandDevice, InputDeviceCommand* command)
-	{
-		if (commandDevice == inputDevice)
-		{
-			if (command->type == Esp32HapticEventCommand.Type)
-			{
-				var cmd = (Esp32HapticEventCommand*)command;
-				SetHapticEventToClient(cmd->eventId);
-				return 0;
-			}
-
-			if (command->type == Esp32HapticRealtimeCommand.Type)
-			{
-				var cmd = (Esp32HapticRealtimeCommand*)command;
-				SendMotorSpeedToClient(cmd->speed);
-				return 0;
-			}
-		}
-
-		return null;
-	}
-#endif
 
 	public void SendMotorSpeed(float speed)
-	{
-#if UNITY_INPUT_SYSTEM
-		inputDevice.SendMotorSpeed(speed);
-#else
-		SendMotorSpeedToClient(speed);
-#endif
-	}
-
-	public void SendHapticEvent(int hapticEventId)
-	{
-#if UNITY_INPUT_SYSTEM
-		inputDevice.SendHapticEvent(hapticEventId);
-#else
-		SetHapticEventToClient(hapticEventId);
-#endif
-	}
-
-	void SendMotorSpeedToClient(float speed)
 	{
 		_client.Send("/arduino/motor/rt", Mathf.RoundToInt(speed * 100));
 	}
 
-	void SetHapticEventToClient(int hapticEventId)
+	public void SendHapticEvent(int hapticEventId)
 	{
 		_client.Send("/arduino/motor/cmd", hapticEventId);
 	}

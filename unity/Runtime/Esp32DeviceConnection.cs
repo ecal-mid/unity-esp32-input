@@ -105,7 +105,7 @@ public class Esp32DeviceConnection : MonoBehaviour
 	{
 		// IN
 		serverPort = serverMinPort;
-		while (serverPort < serverMaxPort)
+		while (serverPort <= serverMaxPort)
 		{
 			try
 			{

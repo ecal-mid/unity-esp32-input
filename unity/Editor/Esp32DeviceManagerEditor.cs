@@ -59,7 +59,8 @@ public class Esp32DeviceManagerEditor : Editor
 			{
 				Esp32Device.ConnectionState.Connected => new Color(.0f, 1, .0f),
 				Esp32Device.ConnectionState.Connecting => new Color(1f, 1f, .0f),
-				Esp32Device.ConnectionState.Disconnected => new Color(1f, .0f, .0f)
+				Esp32Device.ConnectionState.Disconnected => new Color(1f, .0f, .0f),
+				_ => throw new ArgumentOutOfRangeException()
 			};
 			EditorGUILayout.LabelField(activeDevice.connectionState.ToString(), EditorStyles.boldLabel);
 			GUILayout.EndHorizontal();

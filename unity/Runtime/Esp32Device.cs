@@ -133,65 +133,73 @@ public class Esp32Device : IDisposable
 
 	void OnInput(Esp32Event<Esp32InputState> evt)
 	{
-		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
+		if ( evt.senderAddress != client.address)
 			return;
-
-		lock (oscEventQueue)
+		
+		if (connectionState == ConnectionState.Connected)
 		{
-			oscEventQueue.Enqueue(evt);
+			lock (oscEventQueue)
+			{
+				oscEventQueue.Enqueue(evt);
+			}
 		}
 	}
 
 	void OnDisconnect(Esp32Event<ESP32DisconnectInfo> evt)
 	{
-		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
+		if (evt.senderAddress != client.address)
 			return;
-		SetState(ConnectionState.Disconnected);
+		if (connectionState == ConnectionState.Connected)
+		{
+			SetState(ConnectionState.Disconnected);
+		}
 	}
 
 	void OnInfo(Esp32Event<ESP32DeviceInfo> evt)
 	{
-		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
+		if (evt.senderAddress != client.address)
 			return;
+		if(connectionState == ConnectionState.Connected || connectionState == ConnectionState.Connecting)
+		{
 
-		deviceInfo = evt.data;
-		timeSinceLastEvent = 0;
+			deviceInfo = evt.data;
+			timeSinceLastEvent = 0;
 
-		SetState(ConnectionState.Connected);
+			SetState(ConnectionState.Connected);
+		}
 	}
 
 
 	public void SendMotorSpeed(float speed)
 	{
-		if (connectionState != ConnectionState.Connected)
-			return;
-		client.SendMotorSpeed(speed);
+		if (connectionState == ConnectionState.Connected) 
+			client.SendMotorSpeed(speed);
 	}
 
 	public void SendHapticEvent(int hapticEventId)
 	{
-		if (connectionState != ConnectionState.Connected)
-			return;
-		client.SendHapticEvent(hapticEventId);
+		if (connectionState == ConnectionState.Connected) 
+			client.SendHapticEvent(hapticEventId);
 	}
 
 	public void Connect()
 	{
-		if (connectionState != ConnectionState.Disconnected)
-			return;
-		
-		SetState(ConnectionState.Connecting);
-		client.Connect(server.address, server.port);
+		if (connectionState == ConnectionState.Disconnected)
+		{
+			SetState(ConnectionState.Connecting);
+			client.Connect(server.address, server.port);
+		}
 	}
 
 
 	public void Disconnect()
 	{
-		if (connectionState == ConnectionState.Disconnected)
-			return;
-		
-		client.Disconnect();
-		SetState(ConnectionState.Disconnected);
+		if (connectionState == ConnectionState.Connected)
+		{
+
+			client.Disconnect();
+			SetState(ConnectionState.Disconnected);
+		}
 	}
 
 	public void SendHeartbeat()
@@ -203,5 +211,16 @@ public class Esp32Device : IDisposable
 	{
 		this.connectionState = connectionState;
 		connectionStateTime = 0;
+
+		switch (connectionState)
+		{
+			case ConnectionState.Disconnected:
+				currentState = new Esp32InputState
+				{
+					button = false,
+					encoder = 0
+				};
+				break;
+		}
 	}
 }

@@ -60,7 +60,6 @@ public class Esp32Server: IDisposable
 
 	void OnDataReceive(string oscAddress, OscDataHandle data)
 	{
-		Debug.Log(oscAddress);
 		var deviceAddress = data.GetElementAsString(0);
 		switch (oscAddress)
 		{

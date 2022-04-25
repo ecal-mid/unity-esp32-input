@@ -26,10 +26,16 @@ public class Esp32Client: IDisposable
 		oscClient.Send("/arduino/keepalive", 0);
 	}
 
-	public void SendAddress(string address, int port)
+	public void Connect(string address, int port)
 	{
-		oscClient.Send("/arduino/updateip", $"{address}:{port}");
+		oscClient.Send("/arduino/connect", $"{address}:{port}");
 	}
+
+	public void Disconnect()
+	{
+		oscClient.Send("/arduino/disconnect");
+	}
+	
 	public void SendMotorSpeed( float speed)
 	{
 		

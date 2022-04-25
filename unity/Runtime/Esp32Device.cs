@@ -5,13 +5,20 @@ using UnityEngine;
 [Serializable]
 public class Esp32Device : IDisposable
 {
+	public enum ConnectionState
+	{
+		Disconnected,
+		Connecting,
+		Connected
+	}
 
 	Queue<Esp32Event<Esp32InputState>> oscEventQueue = new Queue<Esp32Event<Esp32InputState>>();
 	public List<Esp32InputState> eventsList { get; } = new List<Esp32InputState>();
 
-	public float timeSinceLastEvent { get; private set; }= -1;
+	public float connectionStateTime { get; private set; } = 0;
+	public float timeSinceLastEvent { get; private set; } = -1;
 	public float timeSinceLastIpSend { get; private set; } = 999;
-	public float timeSinceLastHeartbeat { get; private set; }= 999;
+	public float timeSinceLastHeartbeat { get; private set; } = 999;
 
 	public bool ipAutoSendEnabled => !Application.isEditor;
 
@@ -27,22 +34,24 @@ public class Esp32Device : IDisposable
 
 	public Esp32Client client { get; private set; }
 	public Esp32Server server { get; private set; }
-	public bool IsDisposed { get;private set; }
+	public bool IsDisposed { get; private set; }
+
+	public ConnectionState connectionState { get; private set; }
 
 	public Esp32Device(Esp32ClientConnectionSettings settings, Esp32Server espServer)
 	{
 		name = settings.name;
-		client = new Esp32Client(settings.address,settings.port);
-		
+		client = new Esp32Client(settings.address, settings.port);
+
 		server = espServer;
 		server.OnInfo += OnInfo;
 		server.OnInput += OnInput;
+		server.OnDisconnect += OnDisconnect;
 	}
 
 
 	public void Dispose()
 	{
-		
 		if (client != null)
 		{
 			client.Dispose();
@@ -51,9 +60,9 @@ public class Esp32Device : IDisposable
 
 		if (server != null)
 		{
-			
 			server.OnInfo -= OnInfo;
 			server.OnInput -= OnInput;
+			server.OnDisconnect -= OnDisconnect;
 			server = null;
 		}
 
@@ -86,6 +95,8 @@ public class Esp32Device : IDisposable
 		}
 
 
+		connectionStateTime += Time.deltaTime;
+
 		if (timeSinceLastEvent >= 0)
 			timeSinceLastEvent += Time.deltaTime;
 
@@ -94,21 +105,35 @@ public class Esp32Device : IDisposable
 			timeSinceLastIpSend += Time.deltaTime;
 			if (timeSinceLastIpSend > ipSendInterval)
 			{
-				SendAddress();
+				Connect();
 				timeSinceLastIpSend = 0;
 			}
 		}
 
-		timeSinceLastHeartbeat += Time.deltaTime;
-		if (timeSinceLastHeartbeat > heartbeatInterval)
+		switch (connectionState)
 		{
-			SendHeartbeat();
-			timeSinceLastHeartbeat = 0;
+			case ConnectionState.Connected:
+			{
+				timeSinceLastHeartbeat += Time.deltaTime;
+				if (timeSinceLastHeartbeat > heartbeatInterval)
+				{
+					SendHeartbeat();
+					timeSinceLastHeartbeat = 0;
+				}
+
+				break;
+			}
+			case ConnectionState.Connecting:
+				if (connectionStateTime > 10) //timeout
+					SetState(ConnectionState.Disconnected);
+
+				break;
 		}
 	}
+
 	void OnInput(Esp32Event<Esp32InputState> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
 			return;
 
 		lock (oscEventQueue)
@@ -117,33 +142,66 @@ public class Esp32Device : IDisposable
 		}
 	}
 
+	void OnDisconnect(Esp32Event<ESP32DisconnectInfo> evt)
+	{
+		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
+			return;
+		SetState(ConnectionState.Disconnected);
+	}
+
 	void OnInfo(Esp32Event<ESP32DeviceInfo> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (connectionState != ConnectionState.Connected && evt.senderAddress != client.address)
 			return;
-		
+
 		deviceInfo = evt.data;
 		timeSinceLastEvent = 0;
+
+		SetState(ConnectionState.Connected);
 	}
 
 
 	public void SendMotorSpeed(float speed)
 	{
-		client.SendMotorSpeed( speed);
+		if (connectionState != ConnectionState.Connected)
+			return;
+		client.SendMotorSpeed(speed);
 	}
 
 	public void SendHapticEvent(int hapticEventId)
 	{
-		client.SendHapticEvent( hapticEventId);
+		if (connectionState != ConnectionState.Connected)
+			return;
+		client.SendHapticEvent(hapticEventId);
 	}
 
-	public void SendAddress()
+	public void Connect()
 	{
-		client.SendAddress(server.address,server.port);
+		if (connectionState != ConnectionState.Disconnected)
+			return;
+		
+		SetState(ConnectionState.Connecting);
+		client.Connect(server.address, server.port);
+	}
+
+
+	public void Disconnect()
+	{
+		if (connectionState == ConnectionState.Disconnected)
+			return;
+		
+		client.Disconnect();
+		SetState(ConnectionState.Disconnected);
 	}
 
 	public void SendHeartbeat()
 	{
 		client.SendHeartbeat();
+	}
+
+	void SetState(ConnectionState connectionState)
+	{
+		this.connectionState = connectionState;
+		connectionStateTime = 0;
 	}
 }

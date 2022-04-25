@@ -49,32 +49,42 @@ public class Esp32DeviceManagerEditor : Editor
 		
 		if (activeDevice != null)
 		{
-			var isConnected = activeDevice.timeSinceLastEvent >= 0;
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("", "Connection", EditorStyles.boldLabel);
 
 			GUILayout.BeginHorizontal();
 			EditorGUILayout.PrefixLabel("State");
 			var prevColor = GUI.color;
-			GUI.color = isConnected ? new Color(.0f, 1, .0f) : new Color(1f, .0f, .0f);
-			EditorGUILayout.LabelField(isConnected ? "active" : "inactive", EditorStyles.boldLabel);
+			GUI.color = activeDevice.connectionState switch
+			{
+				Esp32Device.ConnectionState.Connected => new Color(.0f, 1, .0f),
+				Esp32Device.ConnectionState.Connecting => new Color(1f, 1f, .0f),
+				Esp32Device.ConnectionState.Disconnected => new Color(1f, .0f, .0f)
+			};
+			EditorGUILayout.LabelField(activeDevice.connectionState.ToString(), EditorStyles.boldLabel);
 			GUILayout.EndHorizontal();
 			GUI.color = prevColor;
 
 			GUILayout.BeginHorizontal();
-			EditorGUILayout.PrefixLabel("Time since last event");
-			EditorGUILayout.LabelField(activeDevice.timeSinceLastEvent >= 0 ? $"{activeDevice.timeSinceLastEvent:0.0}s" : "no events received");
-			GUILayout.EndHorizontal();
-			GUILayout.BeginHorizontal();
 			EditorGUILayout.PrefixLabel(" ");
-			if (GUILayout.Button("Activate"))
+			GUILayout.BeginHorizontal();
+			GUI.enabled = activeDevice.connectionState == Esp32Device.ConnectionState.Disconnected;
+			if (GUILayout.Button("Connect"))
 			{
-				activeDevice.SendAddress();
+				activeDevice.Connect();
+			}
+			GUI.enabled = activeDevice.connectionState == Esp32Device.ConnectionState.Connected;
+			if (GUILayout.Button("Disconnect"))
+			{
+				activeDevice.Disconnect();
 			}
 
+			GUI.enabled = true;
 			GUILayout.EndHorizontal();
 
-			if (isConnected)
+			GUILayout.EndHorizontal();
+
+			if (activeDevice.connectionState == Esp32Device.ConnectionState.Connected)
 			{
 				EditorGUILayout.Space();
 				EditorGUILayout.LabelField("Device Info", EditorStyles.boldLabel);
@@ -104,6 +114,10 @@ public class Esp32DeviceManagerEditor : Editor
 			EditorGUILayout.LabelField("", "Input", EditorStyles.boldLabel);
 			EditorGUILayout.LabelField("Button:", activeDevice.currentState.button ? "down" : "up", EditorStyles.boldLabel);
 			EditorGUILayout.LabelField("Encoder Value:", activeDevice.currentState.encoder.ToString(), EditorStyles.boldLabel);
+			GUILayout.BeginHorizontal();
+			EditorGUILayout.PrefixLabel("Time since last event");
+			EditorGUILayout.LabelField(activeDevice.timeSinceLastEvent >= 0 ? $"{activeDevice.timeSinceLastEvent:0.0}s" : "no events received");
+			GUILayout.EndHorizontal();
 			EditorGUILayout.Space();
 
 			EditorGUILayout.LabelField("", "Output", EditorStyles.boldLabel);

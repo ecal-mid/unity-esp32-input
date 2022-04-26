@@ -31,6 +31,14 @@ public class ESP32DeviceManager : MonoBehaviour
 	{
 		Cleanup();
 	}
+
+	void OnApplicationPause(bool paused)
+	{
+		if(paused)
+			Cleanup();
+		else
+			Init();
+	}
 	
 	void Update()
 	{
@@ -57,8 +65,6 @@ public class ESP32DeviceManager : MonoBehaviour
 
 		try
 		{
-
-
 			receiver = new ESP32Receiver(settings.serverPort);
 
 			for (int i = 0; i < settings.clients.Count; i++)
@@ -75,30 +81,43 @@ public class ESP32DeviceManager : MonoBehaviour
 			}
 
 			state = State.Initialized;
+			Debug.Log($"ESP32 input initialized");
 		}
 		catch (Exception e)
 		{
 			Cleanup();
-			Debug.LogError($"Error starting ESP32 input: {e}");
+			Debug.LogError($"Error initializing ESP32 input: {e}");
 		}
+		
 	}
 	
 	void Cleanup()
 	{
 		if(state != State.Initialized)
 			return;
-		
-		for (int i = devices.Count - 1; i >= 0; i--)
-		{
-			RemoveDevice(devices[i]);
-		}
 
-		if (receiver != null)
+		try
 		{
-			receiver.Dispose();
-			receiver = null;
+
+			for (int i = devices.Count - 1; i >= 0; i--)
+			{
+				RemoveDevice(devices[i]);
+			}
+
+			if (receiver != null)
+			{
+				receiver.Dispose();
+				receiver = null;
+			}
+
+			state = State.NotStarted;
+			Debug.Log($"ESP32 input stopped");
+
 		}
-		state = State.NotStarted;
+		catch (Exception e)
+		{
+			Debug.Log($"ESP32 input failed to stop: {e}");
+		}
 	}
 
 	public void Restart()

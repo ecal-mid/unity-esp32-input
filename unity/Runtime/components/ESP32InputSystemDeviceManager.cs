@@ -32,11 +32,12 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 		esp32DeviceManager.OnDeviceAdded -= OnDeviceAdded;
 		esp32DeviceManager.OnDeviceRemoved -= OnDeviceRemoved;
 
-		var devices = new List<ESP32Device>( inputDevices.Keys);
+		var devices = new List<ESP32Device>(inputDevices.Keys);
 		for (int i = 0; i < devices.Count; i++)
 		{
 			OnDeviceRemoved(devices[i]);
 		}
+
 		RemoveCommandListener();
 	}
 
@@ -54,27 +55,23 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 		}) as Esp32InputDevice;
 		InputSystem.EnableDevice(inputDevice);
 
-		inputDevices.Add(device,inputDevice);
+		device.OnInputReceived += OnInputReceived;
+
+		inputDevices.Add(device, inputDevice);
 	}
 
 	void OnDeviceRemoved(ESP32Device device)
 	{
+		device.OnInputReceived -= OnInputReceived;
+		
 		InputSystem.RemoveDevice(inputDevices[device]);
 
 		inputDevices.Remove(device);
 	}
 
-	void Update()
+	void OnInputReceived(ESP32Device device, ESP32InputState inputState)
 	{
-		foreach (var pair in inputDevices)
-		{
-			var device = pair.Key;
-			var inputDevice = pair.Value;
-			for (var i = 0; i < device.eventsList.Count; i++)
-			{
-				InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevice, device.eventsList[i]); 
-			}
-		}
+		InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevices[device], inputState);
 	}
 
 	unsafe void AddCommandListener()

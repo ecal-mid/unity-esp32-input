@@ -12,9 +12,7 @@ public class ESP32Device : IDisposable
 		Connected
 	}
 
-	Queue<ESP32Event<ESP32InputState>> oscEventQueue = new Queue<ESP32Event<ESP32InputState>>();
-	public List<ESP32InputState> eventsList { get; } = new List<ESP32InputState>();
-
+	public event Action<ESP32Device,ESP32InputState> OnInputReceived;
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
 
@@ -84,29 +82,6 @@ public class ESP32Device : IDisposable
 
 	public void Update()
 	{
-		eventsList.Clear();
-		lock (oscEventQueue)
-		{
-			while (oscEventQueue.Count > 0)
-			{
-				var evt = oscEventQueue.Dequeue();
-				var state = evt.data;
-
-				if (!firstEncoderValueReceived)
-				{
-					zeroEncoderValue = state.encoder;
-					firstEncoderValueReceived = true;
-				}
-
-				state.encoder -= zeroEncoderValue;
-
-				eventsList.Add(state);
-				currentState = state;
-
-				timeSinceLastEvent = 0;
-			}
-		}
-
 
 		connectionStateTime += Time.deltaTime;
 
@@ -154,17 +129,28 @@ public class ESP32Device : IDisposable
 		}
 	}
 
-	void OnInput(ESP32Event<ESP32InputState> evt)
+	public void OnInput(ESP32Event<ESP32InputState> evt)
 	{
 		if (evt.senderAddress != sender.address)
 			return;
 
 		if (connectionState == ConnectionState.Connected)
 		{
-			lock (oscEventQueue)
+			var state = evt.data;
+
+			if (!firstEncoderValueReceived)
 			{
-				oscEventQueue.Enqueue(evt);
+				zeroEncoderValue = state.encoder;
+				firstEncoderValueReceived = true;
 			}
+
+			state.encoder -= zeroEncoderValue;
+
+			currentState = state;
+
+			timeSinceLastEvent = 0;
+
+			OnInputReceived?.Invoke(this,evt.data);
 		}
 	}
 

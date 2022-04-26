@@ -21,7 +21,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 31;
+int firmware = 34;
 
 char ssid[] = WIFI_SSID;                    // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -31,7 +31,8 @@ IPAddress outIp(192, 168, 0, 0);            // remote IP of your computer
 int outPort = 8888;                         // remote port to send OSC
 const unsigned int localPort = 9999;        // local port to listen for OSC packets
 bool authorisedIP = false;
-
+IPAddress lastOutIp(192, 168, 0, 0);
+char ipAsChar[15];
 
 OSCErrorCode error;
 Preferences preferences; // to save persistent data (board name)
@@ -109,9 +110,9 @@ void loop() {
   /* --------- Timing and sleep */
   if (millis() - lastUserInteractionMillis > sleepDelayInMillis) {
     // start deepSleep
-    goToSleep();
+    goToSleep(0);
   }
-  
+
   /* --------- Send battery level and other info every minutes and check wifi connection */
   if (millis() - lastInfoSentMillis > 60 * 1000) {
     // send info
@@ -122,7 +123,7 @@ void loop() {
       restartESP();
     }
   }
-  
+
   /* --------- SEND OSC MSGS */
   // ENCODER
   // read the state of the Encoder
@@ -176,10 +177,12 @@ void loop() {
         msg.dispatch("/arduino/motor/cmd", inMotorCommand);
         msg.dispatch("/arduino/restart", inRestartESP);
         msg.dispatch("/arduino/keepalive", inKeepAlive);
+        msg.dispatch("/arduino/disconnect", inDisconnect);
+        msg.dispatch("/arduino/sleep", inSleep);
       }
       // pass trough access to allow update of outgoing Port and IP
       msg.dispatch("/arduino/setname", inSetName);
-      msg.dispatch("/arduino/updateip", inUpdateIp);
+      msg.dispatch("/arduino/connect", inConnect);
     } else {
       error = msg.getError();
       Serial.print("error: ");
@@ -194,6 +197,9 @@ void loop() {
 /* --------- OUTGOING OSC COMMANDS FUNCTIONS ------------ */
 void outSendValues() { // in button, encoder
   OSCMessage msg("/unity/state/");
+  char brd_name[12];
+  getBoardName().toCharArray(brd_name, 12);
+  msg.add(ipAsChar);
   msg.add(buttonState);
   msg.add(encoderCount);
   Udp.beginPacket(outIp, outPort);
@@ -207,6 +213,7 @@ void outSendInfo() {
   OSCMessage msg("/unity/info/");
   char brd_name[12];
   getBoardName().toCharArray(brd_name, 12);
+  msg.add(ipAsChar);
   msg.add(brd_name);
   msg.add(firmware);
   msg.add(getBatteryLevel());
@@ -217,6 +224,28 @@ void outSendInfo() {
   msg.empty();
   delay (10);
 }
+
+void outSendDisconnect() {
+  OSCMessage msg("/unity/disconnect/");
+  msg.add(ipAsChar);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+  delay (10);
+  Serial.println("disconnect sent");
+}
+
+void outSendAlive(int msg_id) {
+  OSCMessage msg("/unity/alive/");
+  msg.add(ipAsChar);
+  msg.add(msg_id);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}
+
 
 /* --------- INCOMMING OSC COMMANDS FUNCTIONS ------------ */
 
@@ -235,7 +264,7 @@ void inMotorCommand(OSCMessage &msg) { // int value 0-117
   playHaptic(motorCommand);
 }
 
-void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
+void inConnect(OSCMessage &msg) { // string value "ip:port"
   char newIpAndPort[20];
   int str_length = msg.getString(0, newIpAndPort, 20);
   String ipAndportString = String(newIpAndPort);
@@ -244,32 +273,41 @@ void inUpdateIp(OSCMessage &msg) { // string value "ip:port"
   String ipString = ipAndportString.substring(0, colonPos);
   String PortString = ipAndportString.substring(colonPos + 1, ipAndportString.length());
 
+  if (outIp.toString() != ipString) {
+    // send disconnect to last IP
+    outSendDisconnect();
+  }
 
   outIp.fromString(ipString);
   outPort = PortString.toInt();
+  // save iP as Char Array for sending
+  WiFi.localIP().toString().toCharArray(ipAsChar, 15);
 
   Serial.print("New remote IP: ");
   Serial.println(outIp);
   Serial.print("New remote Port: ");
   Serial.println(outPort);
-
   // answer
   outSendInfo();
-  /*OSCMessage answer("/unity/ipupdated/");
-    answer.add(1);
-    Udp.beginPacket(outIp, outPort);
-    answer.send(Udp);
-    Udp.endPacket();
-    answer.empty();*/
+}
+
+void inDisconnect(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
+  outIp.fromString("192.168.0.0");
+  Serial.println("distant Host disconnected");
 }
 
 void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
-  int sleepDelay = msg.getInt(0);
-  keepAlive(sleepDelay);
+  int msg_id = msg.getInt(0);
+  keepAlive(0);
+  outSendAlive(msg_id); // answer
 }
 
 void inRestartESP(OSCMessage &msg) { // no value needed
   restartESP();
+}
+
+void inSleep(OSCMessage &msg) { // no value needed
+  goToSleep(1);
 }
 
 void inSetName(OSCMessage &msg) { // int (will be used a unique identifier number)
@@ -291,7 +329,7 @@ void startWifiAndUdp() {
     delay(500);
     Serial.print(".");
     if (tryCount > 30) {
-      goToSleep(); // go to sleep in not connected after 15 sec
+      goToSleep(1); // go to sleep in not connected after 15 sec
     }
     tryCount++;
   }
@@ -329,9 +367,6 @@ void setBoardName(int nbr) {
 String getBoardName() {
   int nbr = preferences.getInt("name", 0);
   String board_name = "controller" + String(nbr);
-  //String board_name = WiFi.macAddress();
-  //board_name.replace(":", "");
-  //board_name = "magic" + board_name.substring(0, 7);
   return board_name;
 }
 
@@ -378,12 +413,15 @@ void keepAlive(int sleepdelay) { // send value in minutes, if 0 no update of act
   lastUserInteractionMillis = millis(); // reset countdown for deepsleep
 }
 
-void goToSleep() {
-  if (getBatteryLevel() > 4.2) { // fully charged or plugged to a charger so no need to sleep
+void goToSleep(int force) {
+  if (getBatteryLevel() > 4.2 && force != 1) { // fully charged or plugged to a charger so no need to sleep
     keepAlive(0);
     return;
   }
   Serial.println("************* going to sleep, bye! *************");
+  outSendDisconnect();
+  pinMode(encoder_pin_1, OUTPUT);
+  digitalWrite(encoder_pin_1, LOW); // turn of the led
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_27, 0);
   esp_deep_sleep_start();
 }
@@ -406,6 +444,9 @@ void updateIpTable() {
 }
 
 void restartESP() {
+  outSendDisconnect();
+  pinMode(encoder_pin_1, OUTPUT);
+  digitalWrite(encoder_pin_1, LOW); // turn of the led
   Serial.print("Restarting now");
   ESP.restart();
 }

@@ -17,9 +17,8 @@ public class Esp32Device : IDisposable
 
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
-	public float timeSinceLastIpSend { get; private set; } = 999;
 
-	public bool ipAutoSendEnabled => !Application.isEditor;
+	public bool autoConnectEnabled => !Application.isEditor;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
 	public Esp32InputState currentState { get; private set; }
@@ -39,7 +38,6 @@ public class Esp32Device : IDisposable
 
 	HeartbeatState heartbeatState = HeartbeatState.Idle;
 
-	float ipSendInterval = 5;
 	float heartbeatInterval = 5;
 	bool firstEncoderValueReceived = false;
 	float zeroEncoderValue;
@@ -115,15 +113,6 @@ public class Esp32Device : IDisposable
 		if (timeSinceLastEvent >= 0)
 			timeSinceLastEvent += Time.deltaTime;
 
-		if (ipAutoSendEnabled)
-		{
-			timeSinceLastIpSend += Time.deltaTime;
-			if (timeSinceLastIpSend > ipSendInterval)
-			{
-				Connect();
-				timeSinceLastIpSend = 0;
-			}
-		}
 
 		switch (connectionState)
 		{
@@ -152,6 +141,14 @@ public class Esp32Device : IDisposable
 			case ConnectionState.Connecting:
 				if (connectionStateTime > 5) //timeout
 					SetState(ConnectionState.Disconnected);
+
+				break;
+
+			case ConnectionState.Disconnected:
+				if (autoConnectEnabled)
+				{
+					Connect();
+				}
 
 				break;
 		}

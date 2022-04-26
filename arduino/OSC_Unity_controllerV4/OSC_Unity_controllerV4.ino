@@ -21,7 +21,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 33;
+int firmware = 34;
 
 char ssid[] = WIFI_SSID;                    // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -110,7 +110,7 @@ void loop() {
   /* --------- Timing and sleep */
   if (millis() - lastUserInteractionMillis > sleepDelayInMillis) {
     // start deepSleep
-    goToSleep();
+    goToSleep(0);
   }
 
   /* --------- Send battery level and other info every minutes and check wifi connection */
@@ -178,6 +178,7 @@ void loop() {
         msg.dispatch("/arduino/restart", inRestartESP);
         msg.dispatch("/arduino/keepalive", inKeepAlive);
         msg.dispatch("/arduino/disconnect", inDisconnect);
+        msg.dispatch("/arduino/sleep", inSleep);
       }
       // pass trough access to allow update of outgoing Port and IP
       msg.dispatch("/arduino/setname", inSetName);
@@ -235,6 +236,17 @@ void outSendDisconnect() {
   Serial.println("disconnect sent");
 }
 
+void outSendAlive(int msg_id) {
+  OSCMessage msg("/unity/alive/");
+  msg.add(ipAsChar);
+  msg.add(msg_id);
+  Udp.beginPacket(outIp, outPort);
+  msg.send(Udp);
+  Udp.endPacket();
+  msg.empty();
+}
+
+
 /* --------- INCOMMING OSC COMMANDS FUNCTIONS ------------ */
 
 void inMotorRealtime(OSCMessage &msg) { // int value 0-100
@@ -285,12 +297,17 @@ void inDisconnect(OSCMessage &msg) { // int minutes of delay before sleep, send 
 }
 
 void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
-  int sleepDelay = msg.getInt(0);
-  keepAlive(sleepDelay);
+  int msg_id = msg.getInt(0);
+  keepAlive(0);
+  outSendAlive(msg_id); // answer
 }
 
 void inRestartESP(OSCMessage &msg) { // no value needed
   restartESP();
+}
+
+void inSleep(OSCMessage &msg) { // no value needed
+  goToSleep(1);
 }
 
 void inSetName(OSCMessage &msg) { // int (will be used a unique identifier number)
@@ -312,7 +329,7 @@ void startWifiAndUdp() {
     delay(500);
     Serial.print(".");
     if (tryCount > 30) {
-      goToSleep(); // go to sleep in not connected after 15 sec
+      goToSleep(1); // go to sleep in not connected after 15 sec
     }
     tryCount++;
   }
@@ -396,12 +413,15 @@ void keepAlive(int sleepdelay) { // send value in minutes, if 0 no update of act
   lastUserInteractionMillis = millis(); // reset countdown for deepsleep
 }
 
-void goToSleep() {
-  if (getBatteryLevel() > 4.2) { // fully charged or plugged to a charger so no need to sleep
+void goToSleep(int force) {
+  if (getBatteryLevel() > 4.2 && force != 1) { // fully charged or plugged to a charger so no need to sleep
     keepAlive(0);
     return;
   }
   Serial.println("************* going to sleep, bye! *************");
+  outSendDisconnect();
+  pinMode(encoder_pin_1, OUTPUT);
+  digitalWrite(encoder_pin_1, LOW); // turn of the led
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_27, 0);
   esp_deep_sleep_start();
 }
@@ -424,6 +444,9 @@ void updateIpTable() {
 }
 
 void restartESP() {
+  outSendDisconnect();
+  pinMode(encoder_pin_1, OUTPUT);
+  digitalWrite(encoder_pin_1, LOW); // turn of the led
   Serial.print("Restarting now");
   ESP.restart();
 }

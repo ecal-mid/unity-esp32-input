@@ -34,10 +34,13 @@ public class ESP32DeviceManager : MonoBehaviour
 	
 	void Update()
 	{
-		receiver.SendAllEvents();
-		for (int i = 0; i < devices.Count; i++)
+		if (state == State.Initialized)
 		{
-			devices[i].Update();
+			receiver.SendAllEvents();
+			for (int i = 0; i < devices.Count; i++)
+			{
+				devices[i].Update();
+			}
 		}
 	}
 	
@@ -52,22 +55,32 @@ public class ESP32DeviceManager : MonoBehaviour
 		if (!settings)
 			return;
 
-		receiver = new ESP32Receiver(settings.serverPort);
-
-		for (int i = 0; i < settings.clients.Count; i++)
+		try
 		{
-			var clientSettings = settings.clients[i];
-			try
-			{
-				AddDevice(clientSettings);
-			}
-			catch (Exception e)
-			{
-				Debug.LogWarning($"Can't add ESP32 device {clientSettings.address}:{clientSettings.port}\n({e})");
-			}
-		}
 
-		state = State.Initialized;
+
+			receiver = new ESP32Receiver(settings.serverPort);
+
+			for (int i = 0; i < settings.clients.Count; i++)
+			{
+				var clientSettings = settings.clients[i];
+				try
+				{
+					AddDevice(clientSettings);
+				}
+				catch (Exception e)
+				{
+					Debug.LogWarning($"Can't add ESP32 device {clientSettings.address}:{clientSettings.port}\n({e})");
+				}
+			}
+
+			state = State.Initialized;
+		}
+		catch (Exception e)
+		{
+			Cleanup();
+			Debug.LogError($"Error starting ESP32 input: {e}");
+		}
 	}
 	
 	void Cleanup()

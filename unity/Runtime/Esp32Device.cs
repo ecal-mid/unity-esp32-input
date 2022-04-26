@@ -134,7 +134,7 @@ public class Esp32Device : IDisposable
 					if (heartbeatState == HeartbeatState.WaitingForResponse) // previous heartbeat didn't get a response
 					{
 						failedHeartbeats++;
-						Debug.LogWarning($"Heartbeat {heartbeatMsgId} didn't get a response ({failedHeartbeats})");
+						Debug.LogWarning($"Heartbeat {heartbeatMsgId} didn't get a response (failures: {failedHeartbeats})");
 					}
 
 					if (failedHeartbeats >= maxFailedHeartbeatsForDisconnect)

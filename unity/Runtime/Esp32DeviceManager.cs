@@ -14,8 +14,41 @@ public class Esp32DeviceManager : MonoBehaviour
 	public event Action<Esp32Device> OnDeviceAdded;
 	public event Action<Esp32Device> OnDeviceRemoved;
 
+	State state = State.NotStarted;
+	
+	enum State
+	{
+		NotStarted,
+		Initialized
+	}
+
 	void OnEnable()
 	{
+		Init();
+	}
+	
+	void OnDisable()
+	{
+		Cleanup();
+	}
+	
+	void Update()
+	{
+		server.SendAllEvents();
+		for (int i = 0; i < devices.Count; i++)
+		{
+			devices[i].Update();
+		}
+	}
+	
+	void Init()
+	{
+		if(!enabled)
+			return;
+
+		if(state != State.NotStarted)
+			return;
+		
 		if (!settings)
 			return;
 
@@ -33,10 +66,15 @@ public class Esp32DeviceManager : MonoBehaviour
 				Debug.LogWarning($"Can't add ESP32 device {clientSettings.address}:{clientSettings.port}\n({e})");
 			}
 		}
-	}
 
-	void OnDisable()
+		state = State.Initialized;
+	}
+	
+	void Cleanup()
 	{
+		if(state != State.Initialized)
+			return;
+		
 		for (int i = devices.Count - 1; i >= 0; i--)
 		{
 			RemoveDevice(devices[i]);
@@ -47,14 +85,13 @@ public class Esp32DeviceManager : MonoBehaviour
 			server.Dispose();
 			server = null;
 		}
+		state = State.NotStarted;
 	}
 
-	void Update()
+	public void Restart()
 	{
-		for (int i = 0; i < devices.Count; i++)
-		{
-			devices[i].Update();
-		}
+		Cleanup();
+		Init();
 	}
 
 	void AddDevice(Esp32ClientConnectionSettings settings)
@@ -72,4 +109,5 @@ public class Esp32DeviceManager : MonoBehaviour
 		
 		OnDeviceRemoved?.Invoke(device);
 	}
+
 }

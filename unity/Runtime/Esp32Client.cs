@@ -3,7 +3,7 @@ using OscJack;
 using UnityEngine;
 
 [Serializable]
-public class Esp32Client: IDisposable
+public class Esp32Client : IDisposable
 {
 	public string address { get; private set; }
 	public int port { get; private set; }
@@ -20,10 +20,11 @@ public class Esp32Client: IDisposable
 	{
 		oscClient?.Dispose();
 	}
-	
-	public void SendHeartbeat()
+
+
+	public void SendHeartbeat(int msgId)
 	{
-		oscClient.Send("/arduino/keepalive", 0);
+		oscClient.Send("/arduino/keepalive", msgId);
 	}
 
 	public void Connect(string address, int port)
@@ -35,15 +36,24 @@ public class Esp32Client: IDisposable
 	{
 		oscClient.Send("/arduino/disconnect");
 	}
-	
-	public void SendMotorSpeed( float speed)
+
+	public void SendMotorSpeed(float speed)
 	{
-		
 		oscClient.Send("/arduino/motor/rt", Mathf.RoundToInt(speed * 100));
 	}
 
-	public void SendHapticEvent( int hapticEventId)
+	public void SendHapticEvent(int hapticEventId)
 	{
 		oscClient.Send("/arduino/motor/cmd", hapticEventId);
+	}
+
+	public void SendReboot()
+	{
+		oscClient.Send("/arduino/restart");
+	}
+
+	public void SendSleep()
+	{
+		oscClient.Send("/arduino/sleep");
 	}
 }

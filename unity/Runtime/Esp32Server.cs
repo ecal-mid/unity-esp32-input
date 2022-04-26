@@ -1,15 +1,23 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using OscJack;
 using UnityEngine;
 
 [Serializable]
-public class Esp32Server: IDisposable
+public class Esp32Server : IDisposable
 {
+	ConcurrentQueue<Esp32Event<ESP32DeviceInfo>> infoEvents = new ConcurrentQueue<Esp32Event<ESP32DeviceInfo>>();
+	ConcurrentQueue<Esp32Event<Esp32InputState>> inputEvents = new ConcurrentQueue<Esp32Event<Esp32InputState>>();
+	ConcurrentQueue<Esp32Event<ESP32DisconnectInfo>> disconnectEvents = new ConcurrentQueue<Esp32Event<ESP32DisconnectInfo>>();
+	ConcurrentQueue<Esp32Event<ESP32AliveMessage>> aliveEvents = new ConcurrentQueue<Esp32Event<ESP32AliveMessage>>();
+
 	public event Action<Esp32Event<Esp32InputState>> OnInput;
 	public event Action<Esp32Event<ESP32DeviceInfo>> OnInfo;
 	public event Action<Esp32Event<ESP32DisconnectInfo>> OnDisconnect;
+	public event Action<Esp32Event<ESP32AliveMessage>> OnAlive;
 
 	public int port = 8888;
 	public string address { get; private set; }
@@ -24,6 +32,7 @@ public class Esp32Server: IDisposable
 		server.MessageDispatcher.AddCallback("/unity/state/", OnDataReceive);
 		server.MessageDispatcher.AddCallback("/unity/info/", OnDataReceive);
 		server.MessageDispatcher.AddCallback("/unity/disconnect/", OnDataReceive);
+		server.MessageDispatcher.AddCallback("/unity/alive/", OnDataReceive);
 
 		// start update ip loop
 		address = GetLocalAddress();
@@ -57,20 +66,46 @@ public class Esp32Server: IDisposable
 		return address;
 	}
 
+	void SendEvents<T>(ConcurrentQueue<T> queue, Action<T> eventAction)
+	{
+		if (eventAction == null)
+			return;
+		while (queue.TryDequeue(out T evt))
+			eventAction.Invoke(evt);
+	}
+
+	public void SendAllEvents()
+	{
+		SendEvents(infoEvents, OnInfo);
+		SendEvents(inputEvents, OnInput);
+		SendEvents(aliveEvents, OnAlive);
+		SendEvents(disconnectEvents, OnDisconnect);
+	}
 
 	void OnDataReceive(string oscAddress, OscDataHandle data)
 	{
 		var deviceAddress = data.GetElementAsString(0);
 		switch (oscAddress)
 		{
+			case "/unity/alive/":
+			{
+				aliveEvents.Enqueue(new Esp32Event<ESP32AliveMessage>()
+				{
+					senderAddress = deviceAddress,
+					data = new ESP32AliveMessage
+					{
+						msgId = data.GetElementAsInt(1)
+					}
+				});
+				break;
+			}
 			case "/unity/disconnect/":
 			{
-				if (OnDisconnect != null)
-					OnDisconnect(new Esp32Event<ESP32DisconnectInfo>()
-					{
-						senderAddress = deviceAddress,
-						data = default
-					});
+				disconnectEvents.Enqueue(new Esp32Event<ESP32DisconnectInfo>()
+				{
+					senderAddress = deviceAddress,
+					data = default
+				});
 				break;
 			}
 			case "/unity/state/":
@@ -79,12 +114,11 @@ public class Esp32Server: IDisposable
 				state.button = data.GetElementAsInt(1) == 0; // 0 = pressed, 1 = released
 				state.encoder = data.GetElementAsInt(2) / 4095f;
 
-				if (OnInput != null)
-					OnInput(new Esp32Event<Esp32InputState>()
-					{
-						senderAddress = deviceAddress,
-						data = state
-					});
+				inputEvents.Enqueue(new Esp32Event<Esp32InputState>()
+				{
+					senderAddress = deviceAddress,
+					data = state
+				});
 				break;
 			}
 			case "/unity/info/":
@@ -101,15 +135,13 @@ public class Esp32Server: IDisposable
 					hasMotor = data.GetElementAsInt(4) == 1,
 				};
 
-				if (OnInfo != null)
-					OnInfo(new Esp32Event<ESP32DeviceInfo>
-					{
-						senderAddress = deviceAddress,
-						data = deviceInfo
-					});
+				infoEvents.Enqueue(new Esp32Event<ESP32DeviceInfo>
+				{
+					senderAddress = deviceAddress,
+					data = deviceInfo
+				});
 				break;
 			}
 		}
 	}
-
 }

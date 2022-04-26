@@ -18,13 +18,26 @@ public class Esp32Device : IDisposable
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
 	public float timeSinceLastIpSend { get; private set; } = 999;
-	public float timeSinceLastHeartbeat { get; private set; } = 999;
 
 	public bool ipAutoSendEnabled => !Application.isEditor;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
 	public Esp32InputState currentState { get; private set; }
 
+	int heartbeatMsgId;
+	float heartbeatSendTime;
+	float heartbeatReceiveTime;
+	int failedHeartbeats;
+	int maxFailedHeartbeatsForDisconnect = 3;
+	public float lastHeartbeatRTT { get; private set; }
+
+	enum HeartbeatState
+	{
+		Idle,
+		WaitingForResponse
+	}
+
+	HeartbeatState heartbeatState = HeartbeatState.Idle;
 
 	float ipSendInterval = 5;
 	float heartbeatInterval = 5;
@@ -47,6 +60,7 @@ public class Esp32Device : IDisposable
 		server.OnInfo += OnInfo;
 		server.OnInput += OnInput;
 		server.OnDisconnect += OnDisconnect;
+		server.OnAlive += OnAlive;
 	}
 
 
@@ -63,6 +77,7 @@ public class Esp32Device : IDisposable
 			server.OnInfo -= OnInfo;
 			server.OnInput -= OnInput;
 			server.OnDisconnect -= OnDisconnect;
+			server.OnAlive -= OnAlive;
 			server = null;
 		}
 
@@ -114,17 +129,28 @@ public class Esp32Device : IDisposable
 		{
 			case ConnectionState.Connected:
 			{
-				timeSinceLastHeartbeat += Time.deltaTime;
-				if (timeSinceLastHeartbeat > heartbeatInterval)
+				if (Time.time - heartbeatSendTime > heartbeatInterval)
 				{
-					SendHeartbeat();
-					timeSinceLastHeartbeat = 0;
+					if (heartbeatState == HeartbeatState.WaitingForResponse) // previous heartbeat didn't get a response
+					{
+						failedHeartbeats++;
+						Debug.LogWarning($"Heartbeat {heartbeatMsgId} didn't get a response ({failedHeartbeats})");
+					}
+
+					if (failedHeartbeats >= maxFailedHeartbeatsForDisconnect)
+					{
+						SetState(ConnectionState.Disconnected);
+					}
+					else
+					{
+						SendHeartbeat();
+					}
 				}
 
 				break;
 			}
 			case ConnectionState.Connecting:
-				if (connectionStateTime > 10) //timeout
+				if (connectionStateTime > 5) //timeout
 					SetState(ConnectionState.Disconnected);
 
 				break;
@@ -133,9 +159,9 @@ public class Esp32Device : IDisposable
 
 	void OnInput(Esp32Event<Esp32InputState> evt)
 	{
-		if ( evt.senderAddress != client.address)
+		if (evt.senderAddress != client.address)
 			return;
-		
+
 		if (connectionState == ConnectionState.Connected)
 		{
 			lock (oscEventQueue)
@@ -159,9 +185,8 @@ public class Esp32Device : IDisposable
 	{
 		if (evt.senderAddress != client.address)
 			return;
-		if(connectionState == ConnectionState.Connected || connectionState == ConnectionState.Connecting)
+		if (connectionState == ConnectionState.Connected || connectionState == ConnectionState.Connecting)
 		{
-
 			deviceInfo = evt.data;
 			timeSinceLastEvent = 0;
 
@@ -169,16 +194,41 @@ public class Esp32Device : IDisposable
 		}
 	}
 
+	void OnAlive(Esp32Event<ESP32AliveMessage> evt)
+	{
+		if (evt.senderAddress != client.address)
+			return;
+
+		if (connectionState == ConnectionState.Connected)
+		{
+			if (heartbeatState == HeartbeatState.WaitingForResponse)
+			{
+				if (evt.data.msgId == heartbeatMsgId)
+				{
+					//Debug.Log($"receive heartbeat {evt.data.msgId}");
+					heartbeatState = HeartbeatState.Idle;
+					heartbeatReceiveTime = Time.time;
+					lastHeartbeatRTT = heartbeatReceiveTime - heartbeatSendTime;
+					failedHeartbeats = 0;
+				}
+				else
+				{
+					//Debug.Log($"receive OUTDATED heartbeat {evt.data.msgId}");
+				}
+			}
+		}
+	}
+
 
 	public void SendMotorSpeed(float speed)
 	{
-		if (connectionState == ConnectionState.Connected) 
+		if (connectionState == ConnectionState.Connected)
 			client.SendMotorSpeed(speed);
 	}
 
 	public void SendHapticEvent(int hapticEventId)
 	{
-		if (connectionState == ConnectionState.Connected) 
+		if (connectionState == ConnectionState.Connected)
 			client.SendHapticEvent(hapticEventId);
 	}
 
@@ -196,7 +246,6 @@ public class Esp32Device : IDisposable
 	{
 		if (connectionState == ConnectionState.Connected)
 		{
-
 			client.Disconnect();
 			SetState(ConnectionState.Disconnected);
 		}
@@ -204,7 +253,11 @@ public class Esp32Device : IDisposable
 
 	public void SendHeartbeat()
 	{
-		client.SendHeartbeat();
+		heartbeatMsgId++;
+		client.SendHeartbeat(heartbeatMsgId);
+		heartbeatSendTime = Time.time;
+		heartbeatState = HeartbeatState.WaitingForResponse;
+		//Debug.Log($"send heartbeat {heartbeatMsgId}");
 	}
 
 	void SetState(ConnectionState connectionState)
@@ -215,6 +268,8 @@ public class Esp32Device : IDisposable
 		switch (connectionState)
 		{
 			case ConnectionState.Disconnected:
+				heartbeatState = HeartbeatState.Idle;
+				failedHeartbeats = 0;
 				currentState = new Esp32InputState
 				{
 					button = false,
@@ -222,5 +277,15 @@ public class Esp32Device : IDisposable
 				};
 				break;
 		}
+	}
+
+	public void Reboot()
+	{
+		client.SendReboot();
+	}
+
+	public void Sleep()
+	{
+		client.SendSleep();
 	}
 }

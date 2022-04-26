@@ -2,13 +2,13 @@ using System;
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(Esp32DeviceManager))]
+[CustomEditor(typeof(ESP32DeviceManager))]
 [CanEditMultipleObjects]
 public class Esp32DeviceManagerEditor : Editor
 {
 	private int hapticEvent;
 	private float motorSpeed;
-	Esp32Device activeDevice;
+	ESP32Device activeDevice;
 
 	public override bool RequiresConstantRepaint()
 	{
@@ -18,13 +18,13 @@ public class Esp32DeviceManagerEditor : Editor
 	public override void OnInspectorGUI()
 	{
 		base.OnInspectorGUI();
-		var connectionManager = (target as Esp32DeviceManager);
+		var connectionManager = (target as ESP32DeviceManager);
 
 		EditorGUILayout.Space();
 		EditorGUILayout.LabelField("Server", EditorStyles.boldLabel);
 
-		EditorGUILayout.LabelField("Local Address", connectionManager.server != null ? connectionManager.server.address : "none");
-		EditorGUILayout.LabelField("Local Port", connectionManager.server != null ? connectionManager.server.port.ToString() : "none");
+		EditorGUILayout.LabelField("Local Address", connectionManager.receiver != null ? connectionManager.receiver.address : "none");
+		EditorGUILayout.LabelField("Local Port", connectionManager.receiver != null ? connectionManager.receiver.port.ToString() : "none");
 
 		EditorGUILayout.Space();
 		EditorGUILayout.LabelField("Devices", EditorStyles.boldLabel);
@@ -54,7 +54,7 @@ public class Esp32DeviceManagerEditor : Editor
 		{
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("", "Client Connection", EditorStyles.boldLabel);
-			EditorGUILayout.LabelField("IP Address", activeDevice.client.address);
+			EditorGUILayout.LabelField("IP Address", activeDevice.sender.address);
 			EditorGUILayout.LabelField("RTT", $"{activeDevice.lastHeartbeatRTT*1000:0.0}ms");
 
 			GUILayout.BeginHorizontal();
@@ -62,9 +62,9 @@ public class Esp32DeviceManagerEditor : Editor
 			var prevColor = GUI.color;
 			GUI.color = activeDevice.connectionState switch
 			{
-				Esp32Device.ConnectionState.Connected => new Color(.0f, 1, .0f),
-				Esp32Device.ConnectionState.Connecting => new Color(1f, 1f, .0f),
-				Esp32Device.ConnectionState.Disconnected => new Color(1f, .0f, .0f),
+				ESP32Device.ConnectionState.Connected => new Color(.0f, 1, .0f),
+				ESP32Device.ConnectionState.Connecting => new Color(1f, 1f, .0f),
+				ESP32Device.ConnectionState.Disconnected => new Color(1f, .0f, .0f),
 				_ => throw new ArgumentOutOfRangeException()
 			};
 			EditorGUILayout.LabelField(activeDevice.connectionState.ToString(), EditorStyles.boldLabel);
@@ -74,13 +74,13 @@ public class Esp32DeviceManagerEditor : Editor
 			GUILayout.BeginHorizontal();
 			{
 				EditorGUILayout.PrefixLabel(" ");
-				GUI.enabled = activeDevice.connectionState == Esp32Device.ConnectionState.Disconnected;
+				GUI.enabled = activeDevice.connectionState == ESP32Device.ConnectionState.Disconnected;
 				if (GUILayout.Button("Connect"))
 				{
 					activeDevice.Connect();
 				}
 
-				GUI.enabled = activeDevice.connectionState == Esp32Device.ConnectionState.Connected;
+				GUI.enabled = activeDevice.connectionState == ESP32Device.ConnectionState.Connected;
 				if (GUILayout.Button("Disconnect"))
 				{
 					activeDevice.Disconnect();
@@ -91,7 +91,7 @@ public class Esp32DeviceManagerEditor : Editor
 
 			GUILayout.EndHorizontal();
 
-			if (activeDevice.connectionState == Esp32Device.ConnectionState.Connected)
+			if (activeDevice.connectionState == ESP32Device.ConnectionState.Connected)
 			{
 				EditorGUILayout.Space();
 				EditorGUILayout.LabelField("Device Info", EditorStyles.boldLabel);

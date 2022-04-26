@@ -3,13 +3,14 @@ using OscJack;
 using UnityEngine;
 
 [Serializable]
-public class Esp32Client : IDisposable
+public class ESP32Sender : IDisposable
 {
+	
 	public string address { get; private set; }
 	public int port { get; private set; }
 	public OscClient oscClient { get; private set; }
 
-	public Esp32Client(string address, int port)
+	public ESP32Sender(string address, int port)
 	{
 		this.address = address;
 		this.port = port;

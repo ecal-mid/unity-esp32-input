@@ -1,4 +1,4 @@
-public struct Esp32InputState
+public struct ESP32InputState
 {
 	public float encoder;
 	public bool button;

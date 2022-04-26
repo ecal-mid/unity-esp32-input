@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(Esp32DeviceListFromURL))]
+[CustomEditor(typeof(ESP32DeviceListFromURL))]
 [CanEditMultipleObjects]
 public class Esp32DeviceListFromURLEditor : Editor
 {
@@ -9,7 +9,7 @@ public class Esp32DeviceListFromURLEditor : Editor
 	{
 		base.OnInspectorGUI();
 
-		var t = target as Esp32DeviceListFromURL;
+		var t = target as ESP32DeviceListFromURL;
 		
 		GUILayout.BeginHorizontal();
 		EditorGUILayout.PrefixLabel("Reload from URL");

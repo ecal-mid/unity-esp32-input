@@ -4,15 +4,15 @@ using UnityEngine;
 
 [DefaultExecutionOrder(-12)]
 [ExecuteAlways]
-public class Esp32DeviceManager : MonoBehaviour
+public class ESP32DeviceManager : MonoBehaviour
 {
-	public Esp32InputSettings settings;
+	public ESP32InputSettings settings;
 
-	public Esp32Server server { get; private set; }
-	public List<Esp32Device> devices { get; private set; } = new List<Esp32Device>();
+	public ESP32Receiver receiver { get; private set; }
+	public List<ESP32Device> devices { get; private set; } = new List<ESP32Device>();
 	
-	public event Action<Esp32Device> OnDeviceAdded;
-	public event Action<Esp32Device> OnDeviceRemoved;
+	public event Action<ESP32Device> OnDeviceAdded;
+	public event Action<ESP32Device> OnDeviceRemoved;
 
 	State state = State.NotStarted;
 	
@@ -34,7 +34,7 @@ public class Esp32DeviceManager : MonoBehaviour
 	
 	void Update()
 	{
-		server.SendAllEvents();
+		receiver.SendAllEvents();
 		for (int i = 0; i < devices.Count; i++)
 		{
 			devices[i].Update();
@@ -52,7 +52,7 @@ public class Esp32DeviceManager : MonoBehaviour
 		if (!settings)
 			return;
 
-		server = new Esp32Server(settings.serverPort);
+		receiver = new ESP32Receiver(settings.serverPort);
 
 		for (int i = 0; i < settings.clients.Count; i++)
 		{
@@ -80,10 +80,10 @@ public class Esp32DeviceManager : MonoBehaviour
 			RemoveDevice(devices[i]);
 		}
 
-		if (server != null)
+		if (receiver != null)
 		{
-			server.Dispose();
-			server = null;
+			receiver.Dispose();
+			receiver = null;
 		}
 		state = State.NotStarted;
 	}
@@ -94,15 +94,15 @@ public class Esp32DeviceManager : MonoBehaviour
 		Init();
 	}
 
-	void AddDevice(Esp32ClientConnectionSettings settings)
+	void AddDevice(ESP32ClientSettings settings)
 	{
-		var device = new Esp32Device(settings, server);
+		var device = new ESP32Device(settings, receiver);
 		devices.Add(device);
 		
 		OnDeviceAdded?.Invoke(device);
 	}
 
-	void RemoveDevice(Esp32Device device)
+	void RemoveDevice(ESP32Device device)
 	{
 		device.Dispose();
 		devices.Remove(device);

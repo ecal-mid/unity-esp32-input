@@ -81,7 +81,8 @@ public class ESP32DeviceManager : MonoBehaviour
 			}
 
 			state = State.Initialized;
-			Debug.Log($"ESP32 input initialized");
+			
+			LogInfo($"ESP32 input initialized");
 		}
 		catch (Exception e)
 		{
@@ -90,7 +91,7 @@ public class ESP32DeviceManager : MonoBehaviour
 		}
 		
 	}
-	
+
 	void Cleanup()
 	{
 		if(state != State.Initialized)
@@ -111,7 +112,7 @@ public class ESP32DeviceManager : MonoBehaviour
 			}
 
 			state = State.NotStarted;
-			Debug.Log($"ESP32 input stopped");
+			LogInfo($"ESP32 input stopped");
 
 		}
 		catch (Exception e)
@@ -142,4 +143,11 @@ public class ESP32DeviceManager : MonoBehaviour
 		OnDeviceRemoved?.Invoke(device);
 	}
 
+
+	void LogInfo(string s)
+	{
+		if(Application.isEditor)
+			return;
+		Debug.Log(s);
+	}
 }

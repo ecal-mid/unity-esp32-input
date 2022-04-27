@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 [DefaultExecutionOrder(-12)]
 [ExecuteAlways]
@@ -10,12 +13,12 @@ public class ESP32DeviceManager : MonoBehaviour
 
 	public ESP32Receiver receiver { get; private set; }
 	public List<ESP32Device> devices { get; private set; } = new List<ESP32Device>();
-	
+
 	public event Action<ESP32Device> OnConnected;
 	public event Action<ESP32Device> OnDisconnected;
 
 	State state = State.NotStarted;
-	
+
 	enum State
 	{
 		NotStarted,
@@ -25,22 +28,35 @@ public class ESP32DeviceManager : MonoBehaviour
 	void OnEnable()
 	{
 		Init();
+#if UNITY_INPUT_SYSTEM
+		InputSystem.onBeforeUpdate += DoUpdate;
+#endif
 	}
-	
+
 	void OnDisable()
 	{
 		Cleanup();
+#if UNITY_INPUT_SYSTEM
+		InputSystem.onBeforeUpdate -= DoUpdate;
+#endif
 	}
 
 	void OnApplicationPause(bool paused)
 	{
-		if(paused)
+		if (paused)
 			Cleanup();
 		else
 			Init();
 	}
-	
+
 	void Update()
+	{
+#if !UNITY_INPUT_SYSTEM
+		DoUpdate();
+#endif
+	}
+
+	void DoUpdate()
 	{
 		if (state == State.Initialized)
 		{
@@ -51,15 +67,15 @@ public class ESP32DeviceManager : MonoBehaviour
 			}
 		}
 	}
-	
+
 	void Init()
 	{
-		if(!enabled)
+		if (!enabled)
 			return;
 
-		if(state != State.NotStarted)
+		if (state != State.NotStarted)
 			return;
-		
+
 		if (!settings)
 			return;
 

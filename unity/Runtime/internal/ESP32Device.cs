@@ -37,8 +37,6 @@ public class ESP32Device : IDisposable
 	HeartbeatState heartbeatState = HeartbeatState.Idle;
 
 	float heartbeatInterval = 5;
-	bool firstEncoderValueReceived = false;
-	float zeroEncoderValue;
 	public string name;
 
 	public ESP32Sender sender { get; private set; }
@@ -137,14 +135,6 @@ public class ESP32Device : IDisposable
 		if (connectionState == ConnectionState.Connected)
 		{
 			var state = evt.data;
-
-			if (!firstEncoderValueReceived)
-			{
-				zeroEncoderValue = state.encoder;
-				firstEncoderValueReceived = true;
-			}
-
-			state.encoder -= zeroEncoderValue;
 
 			currentState = state;
 

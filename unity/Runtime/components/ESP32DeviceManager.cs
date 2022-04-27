@@ -11,8 +11,8 @@ public class ESP32DeviceManager : MonoBehaviour
 	public ESP32Receiver receiver { get; private set; }
 	public List<ESP32Device> devices { get; private set; } = new List<ESP32Device>();
 	
-	public event Action<ESP32Device> OnDeviceAdded;
-	public event Action<ESP32Device> OnDeviceRemoved;
+	public event Action<ESP32Device> OnConnected;
+	public event Action<ESP32Device> OnDisconnected;
 
 	State state = State.NotStarted;
 	
@@ -130,19 +130,28 @@ public class ESP32DeviceManager : MonoBehaviour
 	void AddDevice(ESP32ClientSettings settings)
 	{
 		var device = new ESP32Device(settings, receiver);
+		device.OnConnected += OnDeviceConnected;
+		device.OnDisconnected += OnDeviceDisconnected;
 		devices.Add(device);
-		
-		OnDeviceAdded?.Invoke(device);
 	}
 
 	void RemoveDevice(ESP32Device device)
 	{
 		device.Dispose();
+		device.OnConnected -= OnDeviceConnected;
+		device.OnDisconnected -= OnDeviceDisconnected;
 		devices.Remove(device);
-		
-		OnDeviceRemoved?.Invoke(device);
 	}
 
+	void OnDeviceConnected(ESP32Device device)
+	{
+		OnConnected?.Invoke(device);
+	}
+
+	void OnDeviceDisconnected(ESP32Device device)
+	{
+		OnDisconnected?.Invoke(device);
+	}
 
 	void LogInfo(string s)
 	{

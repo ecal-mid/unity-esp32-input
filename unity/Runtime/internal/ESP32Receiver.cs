@@ -112,7 +112,7 @@ public class ESP32Receiver : IDisposable
 			{
 				var state = new ESP32InputState();
 				state.button = data.GetElementAsInt(1) == 0; // 0 = pressed, 1 = released
-				state.encoder = data.GetElementAsInt(2) / 4095f;
+				state.encoder = data.GetElementAsInt(2) / 40f;
 
 				inputEvents.Enqueue(new ESP32Event<ESP32InputState>()
 				{

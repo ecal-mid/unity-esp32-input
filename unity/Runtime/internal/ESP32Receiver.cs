@@ -123,7 +123,7 @@ public class ESP32Receiver : IDisposable
 			}
 			case "/unity/info/":
 			{
-				var minVoltage = 3.6f;
+				var minVoltage = 3.5f;
 				var maxVoltage = 4.2f;
 
 				var deviceInfo = new ESP32DeviceInfo

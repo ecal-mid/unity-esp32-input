@@ -63,6 +63,8 @@ public class ESP32Device : IDisposable
 
 	public void Dispose()
 	{
+		if (IsDisposed)
+			throw new Exception($"ESP32 Device {name} was already disposed");
 		if (sender != null)
 		{
 			sender.Dispose();
@@ -98,7 +100,7 @@ public class ESP32Device : IDisposable
 					if (heartbeatState == HeartbeatState.WaitingForResponse) // previous heartbeat didn't get a response
 					{
 						failedHeartbeats++;
-						Debug.LogWarning($"Heartbeat {heartbeatMsgId} didn't get a response (failures: {failedHeartbeats})");
+						Debug.LogWarning($"{name} heartbeat {heartbeatMsgId} didn't get a response (failures: {failedHeartbeats})");
 					}
 
 					if (failedHeartbeats >= maxFailedHeartbeatsForDisconnect)

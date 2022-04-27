@@ -16,7 +16,7 @@ public class ESP32Device : IDisposable
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
 
-	public bool autoConnectEnabled => !Application.isEditor;
+	public bool autoConnectInBuild  { get; private set; } = false;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
 	public ESP32InputState currentState { get; private set; }
@@ -48,6 +48,7 @@ public class ESP32Device : IDisposable
 	public ESP32Device(ESP32ClientSettings settings, ESP32Receiver espReceiver)
 	{
 		name = settings.name;
+		autoConnectInBuild = settings.autoConnectInBuild;
 		sender = new ESP32Sender(settings.address, settings.port);
 
 		receiver = espReceiver;
@@ -118,7 +119,7 @@ public class ESP32Device : IDisposable
 				break;
 
 			case ConnectionState.Disconnected:
-				if (autoConnectEnabled)
+				if (!Application.isEditor && autoConnectInBuild)
 				{
 					Connect();
 				}

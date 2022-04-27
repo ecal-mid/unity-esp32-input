@@ -42,16 +42,21 @@ public class ESP32DeviceListFromURL : MonoBehaviour
 		{
 			list.data.Sort((a, b) => a.name.CompareTo(b.name));
 			var deviceManager = GetComponent<ESP32DeviceManager>();
-			deviceManager.settings.clients.Clear();
+			var newClients = new List<ESP32ClientSettings>();
 			for (int i = 0; i < list.data.Count; i++)
 			{
-				deviceManager.settings.clients.Add(new ESP32ClientSettings
+				var name = list.data[i].name;
+				var prevItem = deviceManager.settings.clients.FindIndex(o=> o.name == name);
+				newClients.Add(new ESP32ClientSettings
 				{
-					name = list.data[i].name,
+					name = name,
 					address = list.data[i].ip,
-					port = 9999
+					port = 9999,
+					autoConnectInBuild = prevItem != -1 ? deviceManager.settings.clients[prevItem].autoConnectInBuild : false
 				});
 			}
+
+			deviceManager.settings.clients = newClients;
 
 			deviceManager.Restart();
 

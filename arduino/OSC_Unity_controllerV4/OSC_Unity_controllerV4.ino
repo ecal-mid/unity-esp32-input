@@ -7,7 +7,6 @@
 
 
   --------------------------------------------------------------------------------------------- */
-
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <HTTPClient.h>
@@ -21,7 +20,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 34;
+int firmware = 36;
 
 char ssid[] = WIFI_SSID;                    // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -128,7 +127,6 @@ void loop() {
   // ENCODER
   // read the state of the Encoder
   encoderCount = encoder.getCount();
-
   if (encoderCount != encoderPrevCount) {
     outSendValues();
     //Serial.println("Encoder count = " + String((int32_t)encoderCount));
@@ -160,8 +158,8 @@ void loop() {
   if (size > 0) {
     // check if the message come from the same Out IP to avoid multiple connections
     if (Udp.remoteIP().toString() != outIp.toString()) {
-      Serial.print("NOT allowed senders IP: ");
-      Serial.println(Udp.remoteIP());
+      //Serial.print("NOT allowed senders IP: ");
+      //Serial.println(Udp.remoteIP());
       authorisedIP = false;
     } else {
       Serial.println("allowed senders IP ");
@@ -265,6 +263,7 @@ void inMotorCommand(OSCMessage &msg) { // int value 0-117
 }
 
 void inConnect(OSCMessage &msg) { // string value "ip:port"
+  encoder.setCount(0); // reset the counter
   char newIpAndPort[20];
   int str_length = msg.getString(0, newIpAndPort, 20);
   String ipAndportString = String(newIpAndPort);
@@ -420,6 +419,7 @@ void goToSleep(int force) {
   }
   Serial.println("************* going to sleep, bye! *************");
   outSendDisconnect();
+  playHapticRT(0.0); // Stop the motor in case it hang running
   pinMode(encoder_pin_1, OUTPUT);
   digitalWrite(encoder_pin_1, LOW); // turn of the led
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_27, 0);
@@ -444,6 +444,7 @@ void updateIpTable() {
 }
 
 void restartESP() {
+  playHapticRT(0.0); // Stop the motor in case it hang running
   outSendDisconnect();
   pinMode(encoder_pin_1, OUTPUT);
   digitalWrite(encoder_pin_1, LOW); // turn of the led

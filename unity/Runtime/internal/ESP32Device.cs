@@ -37,7 +37,7 @@ public class ESP32Device : IDisposable
 	HeartbeatState heartbeatState = HeartbeatState.Idle;
 
 	float heartbeatInterval = 5;
-	public string name;
+	public string name { get; private set; }
 
 	public ESP32Sender sender { get; private set; }
 	public ESP32Receiver receiver { get; private set; }

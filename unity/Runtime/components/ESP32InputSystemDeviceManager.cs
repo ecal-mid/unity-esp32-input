@@ -46,13 +46,14 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 		var inputDevice = InputSystem.AddDevice(new InputDeviceDescription
 		{
 			interfaceName = "ESP32",
-			product = "Input Thing",
+			product = "ESP32 Input Device",
 			version = "1",
-			deviceClass = "box",
+			deviceClass = "ESP32 Input",
 			manufacturer = "ecal",
 			capabilities = "encoder,button,motor",
 			serial = $"{device.sender.address}:{device.sender.port}@{device.receiver.port}",
 		}) as Esp32InputDevice;
+		InputSystem.SetDeviceUsage(inputDevice,device.name);
 		InputSystem.EnableDevice(inputDevice);
 
 		device.OnInputReceived += OnInputReceived;

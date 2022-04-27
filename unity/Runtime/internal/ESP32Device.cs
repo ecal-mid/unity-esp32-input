@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
-public class Esp32Device : IDisposable
+public class ESP32Device : IDisposable
 {
 	public enum ConnectionState
 	{
@@ -12,17 +12,14 @@ public class Esp32Device : IDisposable
 		Connected
 	}
 
-	Queue<Esp32Event<Esp32InputState>> oscEventQueue = new Queue<Esp32Event<Esp32InputState>>();
-	public List<Esp32InputState> eventsList { get; } = new List<Esp32InputState>();
-
+	public event Action<ESP32Device,ESP32InputState> OnInputReceived;
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
-	public float timeSinceLastIpSend { get; private set; } = 999;
 
-	public bool ipAutoSendEnabled => !Application.isEditor;
+	public bool autoConnectInBuild  { get; private set; } = false;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
-	public Esp32InputState currentState { get; private set; }
+	public ESP32InputState currentState { get; private set; }
 
 	int heartbeatMsgId;
 	float heartbeatSendTime;
@@ -39,46 +36,44 @@ public class Esp32Device : IDisposable
 
 	HeartbeatState heartbeatState = HeartbeatState.Idle;
 
-	float ipSendInterval = 5;
 	float heartbeatInterval = 5;
-	bool firstEncoderValueReceived = false;
-	float zeroEncoderValue;
-	public string name;
+	public string name { get; private set; }
 
-	public Esp32Client client { get; private set; }
-	public Esp32Server server { get; private set; }
+	public ESP32Sender sender { get; private set; }
+	public ESP32Receiver receiver { get; private set; }
 	public bool IsDisposed { get; private set; }
 
 	public ConnectionState connectionState { get; private set; }
 
-	public Esp32Device(Esp32ClientConnectionSettings settings, Esp32Server espServer)
+	public ESP32Device(ESP32ClientSettings settings, ESP32Receiver espReceiver)
 	{
 		name = settings.name;
-		client = new Esp32Client(settings.address, settings.port);
+		autoConnectInBuild = settings.autoConnectInBuild;
+		sender = new ESP32Sender(settings.address, settings.port);
 
-		server = espServer;
-		server.OnInfo += OnInfo;
-		server.OnInput += OnInput;
-		server.OnDisconnect += OnDisconnect;
-		server.OnAlive += OnAlive;
+		receiver = espReceiver;
+		receiver.OnInfo += OnInfo;
+		receiver.OnInput += OnInput;
+		receiver.OnDisconnect += OnDisconnect;
+		receiver.OnAlive += OnAlive;
 	}
 
 
 	public void Dispose()
 	{
-		if (client != null)
+		if (sender != null)
 		{
-			client.Dispose();
-			client = null;
+			sender.Dispose();
+			sender = null;
 		}
 
-		if (server != null)
+		if (receiver != null)
 		{
-			server.OnInfo -= OnInfo;
-			server.OnInput -= OnInput;
-			server.OnDisconnect -= OnDisconnect;
-			server.OnAlive -= OnAlive;
-			server = null;
+			receiver.OnInfo -= OnInfo;
+			receiver.OnInput -= OnInput;
+			receiver.OnDisconnect -= OnDisconnect;
+			receiver.OnAlive -= OnAlive;
+			receiver = null;
 		}
 
 		IsDisposed = true;
@@ -86,44 +81,12 @@ public class Esp32Device : IDisposable
 
 	public void Update()
 	{
-		eventsList.Clear();
-		lock (oscEventQueue)
-		{
-			while (oscEventQueue.Count > 0)
-			{
-				var evt = oscEventQueue.Dequeue();
-				var state = evt.data;
-
-				if (!firstEncoderValueReceived)
-				{
-					zeroEncoderValue = state.encoder;
-					firstEncoderValueReceived = true;
-				}
-
-				state.encoder -= zeroEncoderValue;
-
-				eventsList.Add(state);
-				currentState = state;
-
-				timeSinceLastEvent = 0;
-			}
-		}
-
 
 		connectionStateTime += Time.deltaTime;
 
 		if (timeSinceLastEvent >= 0)
 			timeSinceLastEvent += Time.deltaTime;
 
-		if (ipAutoSendEnabled)
-		{
-			timeSinceLastIpSend += Time.deltaTime;
-			if (timeSinceLastIpSend > ipSendInterval)
-			{
-				Connect();
-				timeSinceLastIpSend = 0;
-			}
-		}
 
 		switch (connectionState)
 		{
@@ -154,26 +117,37 @@ public class Esp32Device : IDisposable
 					SetState(ConnectionState.Disconnected);
 
 				break;
+
+			case ConnectionState.Disconnected:
+				if (!Application.isEditor && autoConnectInBuild)
+				{
+					Connect();
+				}
+
+				break;
 		}
 	}
 
-	void OnInput(Esp32Event<Esp32InputState> evt)
+	public void OnInput(ESP32Event<ESP32InputState> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (evt.senderAddress != sender.address)
 			return;
 
 		if (connectionState == ConnectionState.Connected)
 		{
-			lock (oscEventQueue)
-			{
-				oscEventQueue.Enqueue(evt);
-			}
+			var state = evt.data;
+
+			currentState = state;
+
+			timeSinceLastEvent = 0;
+
+			OnInputReceived?.Invoke(this,evt.data);
 		}
 	}
 
-	void OnDisconnect(Esp32Event<ESP32DisconnectInfo> evt)
+	void OnDisconnect(ESP32Event<ESP32DisconnectInfo> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (evt.senderAddress != sender.address)
 			return;
 		if (connectionState == ConnectionState.Connected)
 		{
@@ -181,9 +155,9 @@ public class Esp32Device : IDisposable
 		}
 	}
 
-	void OnInfo(Esp32Event<ESP32DeviceInfo> evt)
+	void OnInfo(ESP32Event<ESP32DeviceInfo> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (evt.senderAddress != sender.address)
 			return;
 		if (connectionState == ConnectionState.Connected || connectionState == ConnectionState.Connecting)
 		{
@@ -194,9 +168,9 @@ public class Esp32Device : IDisposable
 		}
 	}
 
-	void OnAlive(Esp32Event<ESP32AliveMessage> evt)
+	void OnAlive(ESP32Event<ESP32AliveMessage> evt)
 	{
-		if (evt.senderAddress != client.address)
+		if (evt.senderAddress != sender.address)
 			return;
 
 		if (connectionState == ConnectionState.Connected)
@@ -223,13 +197,13 @@ public class Esp32Device : IDisposable
 	public void SendMotorSpeed(float speed)
 	{
 		if (connectionState == ConnectionState.Connected)
-			client.SendMotorSpeed(speed);
+			sender.SendMotorSpeed(speed);
 	}
 
 	public void SendHapticEvent(int hapticEventId)
 	{
 		if (connectionState == ConnectionState.Connected)
-			client.SendHapticEvent(hapticEventId);
+			sender.SendHapticEvent(hapticEventId);
 	}
 
 	public void Connect()
@@ -237,7 +211,7 @@ public class Esp32Device : IDisposable
 		if (connectionState == ConnectionState.Disconnected)
 		{
 			SetState(ConnectionState.Connecting);
-			client.Connect(server.address, server.port);
+			sender.Connect(receiver.address, receiver.port);
 		}
 	}
 
@@ -246,7 +220,7 @@ public class Esp32Device : IDisposable
 	{
 		if (connectionState == ConnectionState.Connected)
 		{
-			client.Disconnect();
+			sender.Disconnect();
 			SetState(ConnectionState.Disconnected);
 		}
 	}
@@ -254,7 +228,7 @@ public class Esp32Device : IDisposable
 	public void SendHeartbeat()
 	{
 		heartbeatMsgId++;
-		client.SendHeartbeat(heartbeatMsgId);
+		sender.SendHeartbeat(heartbeatMsgId);
 		heartbeatSendTime = Time.time;
 		heartbeatState = HeartbeatState.WaitingForResponse;
 		//Debug.Log($"send heartbeat {heartbeatMsgId}");
@@ -270,7 +244,8 @@ public class Esp32Device : IDisposable
 			case ConnectionState.Disconnected:
 				heartbeatState = HeartbeatState.Idle;
 				failedHeartbeats = 0;
-				currentState = new Esp32InputState
+				lastHeartbeatRTT = 0;
+				currentState = new ESP32InputState
 				{
 					button = false,
 					encoder = 0
@@ -281,11 +256,11 @@ public class Esp32Device : IDisposable
 
 	public void Reboot()
 	{
-		client.SendReboot();
+		sender.SendReboot();
 	}
 
 	public void Sleep()
 	{
-		client.SendSleep();
+		sender.SendSleep();
 	}
 }

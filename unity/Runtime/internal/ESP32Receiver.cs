@@ -7,17 +7,17 @@ using OscJack;
 using UnityEngine;
 
 [Serializable]
-public class Esp32Server : IDisposable
+public class ESP32Receiver : IDisposable
 {
-	ConcurrentQueue<Esp32Event<ESP32DeviceInfo>> infoEvents = new ConcurrentQueue<Esp32Event<ESP32DeviceInfo>>();
-	ConcurrentQueue<Esp32Event<Esp32InputState>> inputEvents = new ConcurrentQueue<Esp32Event<Esp32InputState>>();
-	ConcurrentQueue<Esp32Event<ESP32DisconnectInfo>> disconnectEvents = new ConcurrentQueue<Esp32Event<ESP32DisconnectInfo>>();
-	ConcurrentQueue<Esp32Event<ESP32AliveMessage>> aliveEvents = new ConcurrentQueue<Esp32Event<ESP32AliveMessage>>();
+	ConcurrentQueue<ESP32Event<ESP32DeviceInfo>> infoEvents = new ConcurrentQueue<ESP32Event<ESP32DeviceInfo>>();
+	ConcurrentQueue<ESP32Event<ESP32InputState>> inputEvents = new ConcurrentQueue<ESP32Event<ESP32InputState>>();
+	ConcurrentQueue<ESP32Event<ESP32DisconnectInfo>> disconnectEvents = new ConcurrentQueue<ESP32Event<ESP32DisconnectInfo>>();
+	ConcurrentQueue<ESP32Event<ESP32AliveMessage>> aliveEvents = new ConcurrentQueue<ESP32Event<ESP32AliveMessage>>();
 
-	public event Action<Esp32Event<Esp32InputState>> OnInput;
-	public event Action<Esp32Event<ESP32DeviceInfo>> OnInfo;
-	public event Action<Esp32Event<ESP32DisconnectInfo>> OnDisconnect;
-	public event Action<Esp32Event<ESP32AliveMessage>> OnAlive;
+	public event Action<ESP32Event<ESP32InputState>> OnInput;
+	public event Action<ESP32Event<ESP32DeviceInfo>> OnInfo;
+	public event Action<ESP32Event<ESP32DisconnectInfo>> OnDisconnect;
+	public event Action<ESP32Event<ESP32AliveMessage>> OnAlive;
 
 	public int port = 8888;
 	public string address { get; private set; }
@@ -25,7 +25,7 @@ public class Esp32Server : IDisposable
 	OscServer server; // IN
 
 
-	public Esp32Server(int serverPort)
+	public ESP32Receiver(int serverPort)
 	{
 		port = serverPort;
 		server = new OscServer(port);
@@ -89,7 +89,7 @@ public class Esp32Server : IDisposable
 		{
 			case "/unity/alive/":
 			{
-				aliveEvents.Enqueue(new Esp32Event<ESP32AliveMessage>()
+				aliveEvents.Enqueue(new ESP32Event<ESP32AliveMessage>()
 				{
 					senderAddress = deviceAddress,
 					data = new ESP32AliveMessage
@@ -101,7 +101,7 @@ public class Esp32Server : IDisposable
 			}
 			case "/unity/disconnect/":
 			{
-				disconnectEvents.Enqueue(new Esp32Event<ESP32DisconnectInfo>()
+				disconnectEvents.Enqueue(new ESP32Event<ESP32DisconnectInfo>()
 				{
 					senderAddress = deviceAddress,
 					data = default
@@ -110,11 +110,11 @@ public class Esp32Server : IDisposable
 			}
 			case "/unity/state/":
 			{
-				var state = new Esp32InputState();
+				var state = new ESP32InputState();
 				state.button = data.GetElementAsInt(1) == 0; // 0 = pressed, 1 = released
-				state.encoder = data.GetElementAsInt(2) / 4095f;
+				state.encoder = data.GetElementAsInt(2) / 40f;
 
-				inputEvents.Enqueue(new Esp32Event<Esp32InputState>()
+				inputEvents.Enqueue(new ESP32Event<ESP32InputState>()
 				{
 					senderAddress = deviceAddress,
 					data = state
@@ -123,7 +123,7 @@ public class Esp32Server : IDisposable
 			}
 			case "/unity/info/":
 			{
-				var minVoltage = 3.6f;
+				var minVoltage = 3.5f;
 				var maxVoltage = 4.2f;
 
 				var deviceInfo = new ESP32DeviceInfo
@@ -135,7 +135,7 @@ public class Esp32Server : IDisposable
 					hasMotor = data.GetElementAsInt(4) == 1,
 				};
 
-				infoEvents.Enqueue(new Esp32Event<ESP32DeviceInfo>
+				infoEvents.Enqueue(new ESP32Event<ESP32DeviceInfo>
 				{
 					senderAddress = deviceAddress,
 					data = deviceInfo

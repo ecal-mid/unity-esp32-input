@@ -7,14 +7,14 @@ using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.LowLevel;
 
 [ExecuteAlways]
-[RequireComponent(typeof(Esp32DeviceManager))]
-public class Esp32InputSystemDeviceManager : MonoBehaviour
+[RequireComponent(typeof(ESP32DeviceManager))]
+public class ESP32InputSystemDeviceManager : MonoBehaviour
 {
-	public Dictionary<Esp32Device, Esp32InputDevice> inputDevices = new Dictionary<Esp32Device, Esp32InputDevice>();
+	public Dictionary<ESP32Device, Esp32InputDevice> inputDevices = new Dictionary<ESP32Device, Esp32InputDevice>();
 
 	void OnEnable()
 	{
-		var esp32DeviceManager = GetComponent<Esp32DeviceManager>();
+		var esp32DeviceManager = GetComponent<ESP32DeviceManager>();
 
 		for (int i = 0; i < esp32DeviceManager.devices.Count; i++)
 		{
@@ -28,53 +28,51 @@ public class Esp32InputSystemDeviceManager : MonoBehaviour
 
 	void OnDisable()
 	{
-		var esp32DeviceManager = GetComponent<Esp32DeviceManager>();
+		var esp32DeviceManager = GetComponent<ESP32DeviceManager>();
 		esp32DeviceManager.OnDeviceAdded -= OnDeviceAdded;
 		esp32DeviceManager.OnDeviceRemoved -= OnDeviceRemoved;
 
-		var devices = new List<Esp32Device>( inputDevices.Keys);
+		var devices = new List<ESP32Device>(inputDevices.Keys);
 		for (int i = 0; i < devices.Count; i++)
 		{
 			OnDeviceRemoved(devices[i]);
 		}
+
 		RemoveCommandListener();
 	}
 
-	void OnDeviceAdded(Esp32Device device)
+	void OnDeviceAdded(ESP32Device device)
 	{
 		var inputDevice = InputSystem.AddDevice(new InputDeviceDescription
 		{
 			interfaceName = "ESP32",
-			product = "Input Thing",
+			product = "ESP32 Input Device",
 			version = "1",
-			deviceClass = "box",
+			deviceClass = "ESP32 Input",
 			manufacturer = "ecal",
 			capabilities = "encoder,button,motor",
-			serial = $"{device.client.address}:{device.client.port}@{device.server.port}",
+			serial = $"{device.sender.address}:{device.sender.port}@{device.receiver.port}",
 		}) as Esp32InputDevice;
+		InputSystem.SetDeviceUsage(inputDevice,device.name);
 		InputSystem.EnableDevice(inputDevice);
 
-		inputDevices.Add(device,inputDevice);
+		device.OnInputReceived += OnInputReceived;
+
+		inputDevices.Add(device, inputDevice);
 	}
 
-	void OnDeviceRemoved(Esp32Device device)
+	void OnDeviceRemoved(ESP32Device device)
 	{
+		device.OnInputReceived -= OnInputReceived;
+		
 		InputSystem.RemoveDevice(inputDevices[device]);
 
 		inputDevices.Remove(device);
 	}
 
-	void Update()
+	void OnInputReceived(ESP32Device device, ESP32InputState inputState)
 	{
-		foreach (var pair in inputDevices)
-		{
-			var device = pair.Key;
-			var inputDevice = pair.Value;
-			for (var i = 0; i < device.eventsList.Count; i++)
-			{
-				InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevice, device.eventsList[i]); 
-			}
-		}
+		InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevices[device], inputState);
 	}
 
 	unsafe void AddCommandListener()
@@ -114,7 +112,7 @@ public class Esp32InputSystemDeviceManager : MonoBehaviour
 		return null;
 	}
 
-	Esp32Device FindEspDevice(Esp32InputDevice device)
+	ESP32Device FindEspDevice(Esp32InputDevice device)
 	{
 		foreach (var pair in inputDevices)
 		{

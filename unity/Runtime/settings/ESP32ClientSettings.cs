@@ -1,9 +1,10 @@
 using System;
 
 [Serializable]
-public struct Esp32ClientConnectionSettings
+public struct ESP32ClientSettings
 {
 	public string name;
 	public string address;
 	public int port;
+	public bool autoConnectInBuild;
 }

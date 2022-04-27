@@ -4,7 +4,7 @@ using System;
 using UnityEditor;
 using UnityEngine;
 
-[CustomEditor(typeof(Esp32InputSystemDeviceManager))]
+[CustomEditor(typeof(ESP32InputSystemDeviceManager))]
 [CanEditMultipleObjects]
 public class Esp32InputSystemDeviceManagerEditor : Editor
 {
@@ -17,7 +17,7 @@ public class Esp32InputSystemDeviceManagerEditor : Editor
 	public override void OnInspectorGUI()
 	{
 		base.OnInspectorGUI();
-		var _target = (target as Esp32InputSystemDeviceManager);
+		var _target = (target as ESP32InputSystemDeviceManager);
 
 		EditorGUI.indentLevel++;
 		foldout = EditorGUILayout.Foldout(foldout,"Input Devices");

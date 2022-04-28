@@ -18,30 +18,33 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 
 		for (int i = 0; i < esp32DeviceManager.devices.Count; i++)
 		{
-			OnDeviceAdded(esp32DeviceManager.devices[i]);
+			if(esp32DeviceManager.devices[i].connectionState == ESP32Device.ConnectionState.Connected)
+				OnDeviceConnected(esp32DeviceManager.devices[i]);
 		}
 
-		esp32DeviceManager.OnDeviceAdded += OnDeviceAdded;
-		esp32DeviceManager.OnDeviceRemoved += OnDeviceRemoved;
+		esp32DeviceManager.OnConnected += OnDeviceConnected;
+		esp32DeviceManager.OnDisconnected += OnDeviceDisconnected;
 		AddCommandListener();
+
+		
 	}
 
 	void OnDisable()
 	{
 		var esp32DeviceManager = GetComponent<ESP32DeviceManager>();
-		esp32DeviceManager.OnDeviceAdded -= OnDeviceAdded;
-		esp32DeviceManager.OnDeviceRemoved -= OnDeviceRemoved;
+		esp32DeviceManager.OnConnected -= OnDeviceConnected;
+		esp32DeviceManager.OnDisconnected -= OnDeviceDisconnected;
 
 		var devices = new List<ESP32Device>(inputDevices.Keys);
 		for (int i = 0; i < devices.Count; i++)
 		{
-			OnDeviceRemoved(devices[i]);
+			OnDeviceDisconnected(devices[i]);
 		}
 
 		RemoveCommandListener();
 	}
 
-	void OnDeviceAdded(ESP32Device device)
+	void OnDeviceConnected(ESP32Device device)
 	{
 		var inputDevice = InputSystem.AddDevice(new InputDeviceDescription
 		{
@@ -55,17 +58,15 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 		}) as Esp32InputDevice;
 		InputSystem.SetDeviceUsage(inputDevice,device.name);
 		InputSystem.EnableDevice(inputDevice);
-
 		device.OnInputReceived += OnInputReceived;
 
 		inputDevices.Add(device, inputDevice);
 	}
 
-	void OnDeviceRemoved(ESP32Device device)
+	void OnDeviceDisconnected(ESP32Device device)
 	{
-		device.OnInputReceived -= OnInputReceived;
-		
 		InputSystem.RemoveDevice(inputDevices[device]);
+		device.OnInputReceived -= OnInputReceived;
 
 		inputDevices.Remove(device);
 	}

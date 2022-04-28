@@ -12,11 +12,13 @@ public class ESP32Device : IDisposable
 		Connected
 	}
 
-	public event Action<ESP32Device,ESP32InputState> OnInputReceived;
+	public event Action<ESP32Device, ESP32InputState> OnInputReceived;
+	public event Action<ESP32Device> OnConnected;
+	public event Action<ESP32Device> OnDisconnected;
 	public float connectionStateTime { get; private set; } = 0;
 	public float timeSinceLastEvent { get; private set; } = -1;
 
-	public bool autoConnectInBuild  { get; private set; } = false;
+	public bool autoConnectInBuild { get; private set; } = false;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
 	public ESP32InputState currentState { get; private set; }
@@ -61,6 +63,8 @@ public class ESP32Device : IDisposable
 
 	public void Dispose()
 	{
+		if (IsDisposed)
+			throw new Exception($"ESP32 Device {name} was already disposed");
 		if (sender != null)
 		{
 			sender.Dispose();
@@ -81,7 +85,6 @@ public class ESP32Device : IDisposable
 
 	public void Update()
 	{
-
 		connectionStateTime += Time.deltaTime;
 
 		if (timeSinceLastEvent >= 0)
@@ -97,7 +100,7 @@ public class ESP32Device : IDisposable
 					if (heartbeatState == HeartbeatState.WaitingForResponse) // previous heartbeat didn't get a response
 					{
 						failedHeartbeats++;
-						Debug.LogWarning($"Heartbeat {heartbeatMsgId} didn't get a response (failures: {failedHeartbeats})");
+						Debug.LogWarning($"{name} heartbeat {heartbeatMsgId} didn't get a response (failures: {failedHeartbeats})");
 					}
 
 					if (failedHeartbeats >= maxFailedHeartbeatsForDisconnect)
@@ -141,7 +144,7 @@ public class ESP32Device : IDisposable
 
 			timeSinceLastEvent = 0;
 
-			OnInputReceived?.Invoke(this,evt.data);
+			OnInputReceived?.Invoke(this, evt.data);
 		}
 	}
 
@@ -159,12 +162,15 @@ public class ESP32Device : IDisposable
 	{
 		if (evt.senderAddress != sender.address)
 			return;
-		if (connectionState == ConnectionState.Connected || connectionState == ConnectionState.Connecting)
+
+		if (connectionState == ConnectionState.Connecting)
+		{
+			SetState(ConnectionState.Connected);
+		}
+		if (connectionState == ConnectionState.Connected )
 		{
 			deviceInfo = evt.data;
 			timeSinceLastEvent = 0;
-
-			SetState(ConnectionState.Connected);
 		}
 	}
 
@@ -234,11 +240,33 @@ public class ESP32Device : IDisposable
 		//Debug.Log($"send heartbeat {heartbeatMsgId}");
 	}
 
-	void SetState(ConnectionState connectionState)
+	void SetState(ConnectionState newState)
 	{
-		this.connectionState = connectionState;
+		if (connectionState == newState)
+		{
+			Debug.LogWarning($"Can't set state: {newState}, already set");
+			return;
+		}
+
+		// LEAVE STATE
+		switch (connectionState)
+		{
+			case ConnectionState.Disconnected:
+				break;
+			case ConnectionState.Connecting:
+				break;
+			case ConnectionState.Connected:
+				OnDisconnected?.Invoke(this);
+				break;
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
+
+		var prevState = connectionState;
+		connectionState = newState;
 		connectionStateTime = 0;
 
+		// ENTER STATE
 		switch (connectionState)
 		{
 			case ConnectionState.Disconnected:
@@ -250,6 +278,9 @@ public class ESP32Device : IDisposable
 					button = false,
 					encoder = 0
 				};
+				break;
+			case ConnectionState.Connected:
+				OnConnected?.Invoke(this);
 				break;
 		}
 	}

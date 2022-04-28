@@ -17,5 +17,12 @@
   "dependencies": {
     "jp.keijiro.osc-jack": "1.0.3"
   },
-  "type": "library"
+  "type": "library", 
+  "samples": [
+  {
+    "displayName": "Input System Samples",
+    "description": "Input System usage samples.",
+    "path": "Samples~/InputSystem"
+  }
+]
 }

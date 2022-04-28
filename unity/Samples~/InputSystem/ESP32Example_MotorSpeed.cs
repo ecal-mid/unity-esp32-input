@@ -1,4 +1,3 @@
-#if UNITY_INPUT_SYSTEM
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -32,5 +31,3 @@ public class ESP32Example_MotorSpeed : MonoBehaviour
 		}
 	}
 }
-
-#endif

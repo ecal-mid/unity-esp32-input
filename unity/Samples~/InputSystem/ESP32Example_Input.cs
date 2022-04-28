@@ -1,4 +1,3 @@
-#if UNITY_INPUT_SYSTEM
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -21,5 +20,3 @@ public class ESP32Example_Input : MonoBehaviour
 		transform.localScale = (button.IsPressed() ? 1.5f : 1) * Vector3.one;
 	}
 }
-
-#endif

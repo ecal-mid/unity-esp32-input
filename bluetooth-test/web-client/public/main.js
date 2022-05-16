@@ -29,7 +29,10 @@ async function connect() {
             }
         ]
     });
-    device.addEventListener('gattserverdisconnected', disconnected);
+    device.addEventListener('gattserverdisconnected', () => {
+        server = undefined;
+        disconnected();
+    });
     server = await device.gatt.connect();
     connected();
     const service = await server.getPrimaryService(INPUT_SERVICE_UUID);

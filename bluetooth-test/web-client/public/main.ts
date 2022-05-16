@@ -46,7 +46,10 @@ async function connect() {
     })
 
 
-    device.addEventListener('gattserverdisconnected', disconnected);
+    device.addEventListener('gattserverdisconnected',()=>{
+        server = undefined
+        disconnected()
+    });
 
     server = await device.gatt.connect()
 

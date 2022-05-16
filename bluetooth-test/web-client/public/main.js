@@ -1,6 +1,8 @@
 const INPUT_SERVICE_UUID = "78880000-d9af-4592-a7ac-4d5830390106";
 const INPUT_SERVICE_ENCODER_CHARACTERISTIC_UUID = "78880001-d9af-4592-a7ac-4d5830390106";
 const INPUT_SERVICE_BUTTON_CHARACTERISTIC_UUID = "78880002-d9af-4592-a7ac-4d5830390106";
+const BATTERY_SERVICE_UUID = 0x180F;
+const BATTERY_SERVICE_BATTERY_LEVEL_CHARACTERISTIC_UUID = 0x2A19;
 let server;
 async function observeCharacteristic(options) {
     // wait for updates
@@ -27,6 +29,9 @@ async function connect() {
                     INPUT_SERVICE_UUID
                 ]
             }
+        ],
+        optionalServices: [
+            BATTERY_SERVICE_UUID
         ]
     });
     device.addEventListener('gattserverdisconnected', () => {
@@ -35,18 +40,27 @@ async function connect() {
     });
     server = await device.gatt.connect();
     connected();
-    const service = await server.getPrimaryService(INPUT_SERVICE_UUID);
+    // input
+    const inputService = await server.getPrimaryService(INPUT_SERVICE_UUID);
     await observeCharacteristic({
-        service: service,
+        service: inputService,
         characteristicUUID: INPUT_SERVICE_ENCODER_CHARACTERISTIC_UUID,
         decode: (data) => data.getInt32(0, true),
         onValueChanged: (value) => updateEncoderValue(value)
     });
     await observeCharacteristic({
-        service: service,
+        service: inputService,
         characteristicUUID: INPUT_SERVICE_BUTTON_CHARACTERISTIC_UUID,
         decode: (data) => data.getInt32(0, true),
         onValueChanged: (value) => updateButtonValue(value == 1)
+    });
+    // battery
+    const batteryService = await server.getPrimaryService(BATTERY_SERVICE_UUID);
+    await observeCharacteristic({
+        service: batteryService,
+        characteristicUUID: BATTERY_SERVICE_BATTERY_LEVEL_CHARACTERISTIC_UUID,
+        decode: (data) => data.getUint8(0),
+        onValueChanged: (value) => updateBatteryValue(value)
     });
 }
 async function disconnect() {
@@ -72,6 +86,9 @@ function updateEncoderValue(value) {
 }
 function updateButtonValue(value) {
     document.querySelector("span[data-value=button]").innerHTML = (value ? 1 : 0).toString();
+}
+function updateBatteryValue(value) {
+    document.querySelector("span[data-value=battery]").innerHTML = value.toString();
 }
 function updateButtons() {
     connectButton.disabled = server !== undefined;

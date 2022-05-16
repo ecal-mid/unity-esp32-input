@@ -1,9 +1,6 @@
 
 #pragma once
 
-#define BATTERY_SERVICE_UUID "0x180F"
-#define BATTERY_LEVEL_CHARACTERISTIC_UUID "0x2A19"
-
 #define DEVICE_NAME_UUID "0x2a00"
 #define APPEARANCE_UUID "0x2a01"
 

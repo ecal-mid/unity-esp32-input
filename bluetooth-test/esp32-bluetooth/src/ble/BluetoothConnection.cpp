@@ -6,7 +6,6 @@
 #include "BLEServer.h"
 #include "BLEUtils.h"
 #include "BLEService.h"
-#include "input/InputService.h"
 #include "esp_log.h"
 
 BluetoothConnection::BluetoothConnection()
@@ -37,10 +36,9 @@ void BluetoothConnection::startAdvertising()
 
 void BluetoothConnection::onConnect(BLEServer *pServer)
 {
-
   connectionState = ConnectionState::Connected;
 
-  log_i("client read characteristic");
+  log_i("client connected");
 }
 
 void BluetoothConnection::onDisconnect(BLEServer *pServer)
@@ -48,5 +46,5 @@ void BluetoothConnection::onDisconnect(BLEServer *pServer)
   connectionState = ConnectionState::Disconnected;
   pServer->startAdvertising();
 
-  log_i("client read characteristic");
+  log_i("client disconnected");
 }

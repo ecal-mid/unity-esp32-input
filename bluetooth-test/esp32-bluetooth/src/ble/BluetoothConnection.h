@@ -4,7 +4,6 @@
 #include "BLEServer.h"
 #include "BLEUtils.h"
 #include "BLEService.h"
-#include "input/InputService.h"
 
 enum ConnectionState
 {
@@ -23,7 +22,6 @@ public:
 
 private:
   ConnectionState connectionState = ConnectionState::Disconnected;
-  InputService *inputService = NULL;
   BLEAdvertising *advertising = NULL;
 
   void onConnect(BLEServer *pServer);

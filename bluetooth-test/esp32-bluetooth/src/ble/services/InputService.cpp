@@ -13,20 +13,13 @@ InputService::InputService(BLEServer *server)
 
   this->encoderCharacteristic = this->service->createCharacteristic(
       INPUT_SERVICE_ENCODER_CHARACTERISTIC_UUID,
-      BLECharacteristic::PROPERTY_READ |
-          //    BLECharacteristic::PROPERTY_WRITE |
-          BLECharacteristic::PROPERTY_NOTIFY |
-          BLECharacteristic::PROPERTY_INDICATE);
-  this->encoderCharacteristic->setNotifyProperty(true);
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
   this->encoderCharacteristic->setCallbacks(this);
   this->encoderCharacteristic->addDescriptor(new BLE2902()); // for notifications
 
   this->buttonCharacteristic = this->service->createCharacteristic(
       INPUT_SERVICE_BUTTON_CHARACTERISTIC_UUID,
-      BLECharacteristic::PROPERTY_READ |
-          //    BLECharacteristic::PROPERTY_WRITE |
-          BLECharacteristic::PROPERTY_NOTIFY |
-          BLECharacteristic::PROPERTY_INDICATE);
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
   this->buttonCharacteristic->setCallbacks(this);
   this->buttonCharacteristic->addDescriptor(new BLE2902()); // for notifications
 
@@ -37,10 +30,10 @@ InputService::InputService(BLEServer *server)
 
 void InputService::onRead(BLECharacteristic *pCharacteristic)
 {
-  log_i("client read characteristic");
+  log_i("client read characteristic %s", pCharacteristic->getUUID().toString());
 }
 
 void InputService::onWrite(BLECharacteristic *pCharacteristic)
 {
-  log_i("client wrote characteristic");
+  log_i("client wrote characteristic %s", pCharacteristic->getUUID().toString());
 }

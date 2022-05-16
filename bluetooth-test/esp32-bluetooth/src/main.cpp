@@ -2,62 +2,79 @@
 #include <Arduino.h>
 #include "esp_log.h"
 #include "ble/BluetoothConnection.h"
+#include "ble/services/BatteryService.h"
+#include "ble/services/InputService.h"
 #include "io/button.h"
 #include "io/motor.h"
 #include "io/encoder.h"
+#include "io/battery.h"
+#include "utils/bleUtils.h"
 
 BluetoothConnection *bluetooth = NULL;
 InputService *inputService = NULL;
+BatteryService *batteryService = NULL;
 
+BatteryState batteryState = BatteryState();
 ButtonState buttonState = ButtonState();
 EncoderState encoderState = EncoderState();
 MotorState motorState = MotorState();
-bool inputInitialized = false;
+
+long lastInput = 0;
+int inputSleepTimeoutSeconds = 60 * 5;
 
 void setup()
 {
 
-  log_i("init: %d", encoderState.count);
+  log_i("**** starting ****");
 
-  initButton(buttonState, 27);
+  initButton(buttonState, GPIO_NUM_27);
   initEncoder(encoderState, 13, 15);
   initMotor(motorState);
+  initBattery(batteryState);
+
   bluetooth = new BluetoothConnection();
 
   inputService = new InputService(bluetooth->pServer);
   bluetooth->addService(*inputService->service);
+
+  batteryService = new BatteryService(bluetooth->pServer);
+  bluetooth->addService(*batteryService->service);
+
   bluetooth->startAdvertising();
 }
 
 void loop()
 {
-  // notify changed value
-  // if (deviceConnected) {
-  // pCharacteristic->setValue((uint8_t*)&value, 4);
-  // pCharacteristic->notify();
-  // value++;
-  // log_i( "loop");
-
   updateButton(buttonState);
   updateEncoder(encoderState);
   updateMotor(motorState);
+  updateBattery(batteryState);
 
-  if (hasButtonChanged(buttonState) || !inputInitialized)
+  if (setCharacteristicValueIfChanged(*inputService->buttonCharacteristic, buttonState.isPressed))
   {
-    int btnDown = buttonState.isPressed ? 1 : 0;
-    inputService->buttonCharacteristic->setValue(btnDown);
-    inputService->buttonCharacteristic->notify();
+    lastInput = millis();
     log_i("is Pressed: %d", buttonState.isPressed);
   }
 
-  if (hasEncoderChanged(encoderState) || !inputInitialized)
+  if (setCharacteristicValueIfChanged(*inputService->encoderCharacteristic, encoderState.count))
   {
-    inputService->encoderCharacteristic->setValue(encoderState.count);
-    inputService->encoderCharacteristic->notify();
-
+    lastInput = millis();
     log_i("encoder: %d", encoderState.count);
   }
+  int batteryLevel = round(batteryState.level * 100);
+  if (setCharacteristicValueIfChanged(*batteryService->batteryLevelCharacteristic, batteryLevel))
+    log_i("battery level: %d%%", batteryLevel);
 
-  inputInitialized = true;
-  delay(10); // bluetooth stack will go into congestion, if too many packets are sent, in 6 hours test i was able to go as low as 3ms
+  delay(10);
+
+  if (millis() - lastInput > inputSleepTimeoutSeconds * 1000)
+  {
+    log_i("falling asleep.. no input since more than %is", inputSleepTimeoutSeconds);
+
+    // TODO: Stop the motor in case it hang running
+    pinMode(encoderState.encoder.aPinNumber, OUTPUT);
+    digitalWrite(encoderState.encoder.aPinNumber, LOW); // turn of the led
+    esp_sleep_enable_ext0_wakeup(buttonState.pin, 0);
+    esp_deep_sleep_start();
+  }
 }

@@ -2,11 +2,9 @@
 
 struct ButtonState
 {
-    bool prevIsPressed = false;
     bool isPressed = false;
-    int pin = 0;
+    gpio_num_t pin = GPIO_NUM_0;
 };
 
-void initButton(ButtonState &state, int pin);
+void initButton(ButtonState &state, gpio_num_t pin);
 void updateButton(ButtonState &state);
-bool hasButtonChanged(ButtonState &state);

@@ -17,11 +17,5 @@ void initEncoder(EncoderState &state, int pin1, int pin2)
 
 void updateEncoder(EncoderState &state)
 {
-    state.prevCount = state.count;
     state.count = state.encoder.getCount();
-}
-
-bool hasEncoderChanged(EncoderState &state)
-{
-    return state.prevCount != state.count;
 }

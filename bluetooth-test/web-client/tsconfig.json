@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "es2020",
+      "dom",
+      "dom.iterable"
+    ],
+    "allowSyntheticDefaultImports": true,
+    "target": "es2019",
+    "moduleResolution": "node",
+    "sourceMap": true
+  },
+  "include": [
+    "./**/*.ts"
+  ]
+}

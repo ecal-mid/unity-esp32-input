@@ -3,7 +3,7 @@
   Controller for Unity
   Communication via OSC
 
-  V3 AB/ECAL 2022
+  V4 AB/ECAL 2022
 
 
   --------------------------------------------------------------------------------------------- */
@@ -20,7 +20,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 36;
+int firmware = 37;
 
 char ssid[] = WIFI_SSID;                    // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -56,6 +56,8 @@ int32_t encoderCount;
 unsigned long lastUserInteractionMillis = 0;
 int sleepDelayInMillis = 1  * 60 * 1000; // time in milliseconds to wait before standby
 unsigned long lastInfoSentMillis = 0;
+unsigned long lastKeepAliveReceived = 0;
+bool clientConnected = false;
 
 /* ------- Adafruit_DRV2605 */
 Adafruit_DRV2605 drv;
@@ -110,6 +112,11 @@ void loop() {
   if (millis() - lastUserInteractionMillis > sleepDelayInMillis) {
     // start deepSleep
     goToSleep(0);
+  }
+  /* --------- if no diconnect message received but no keepAlive message comming then disconnect */
+  if (millis() - lastKeepAliveReceived > 15*1000 && clientConnected == true) {
+    autoDisconnect();
+    Serial.println("auto disconnect");
   }
 
   /* --------- Send battery level and other info every minutes and check wifi connection */
@@ -263,6 +270,9 @@ void inMotorCommand(OSCMessage &msg) { // int value 0-117
 }
 
 void inConnect(OSCMessage &msg) { // string value "ip:port"
+  lastKeepAliveReceived = millis();
+  clientConnected = true;
+  playHapticRT(0.0);
   encoder.setCount(0); // reset the counter
   char newIpAndPort[20];
   int str_length = msg.getString(0, newIpAndPort, 20);
@@ -290,14 +300,14 @@ void inConnect(OSCMessage &msg) { // string value "ip:port"
   outSendInfo();
 }
 
-void inDisconnect(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
-  outIp.fromString("192.168.0.0");
-  Serial.println("distant Host disconnected");
+void inDisconnect(OSCMessage &msg) { 
+  autoDisconnect();
 }
 
-void inKeepAlive(OSCMessage &msg) { // int minutes of delay before sleep, send 0 if no change
+void inKeepAlive(OSCMessage &msg) { 
   int msg_id = msg.getInt(0);
   keepAlive(0);
+  lastKeepAliveReceived = millis();
   outSendAlive(msg_id); // answer
 }
 
@@ -378,6 +388,12 @@ float getBatteryLevel() {
   return (voltageLevel);
 }
 
+void autoDisconnect(){
+  clientConnected = false;
+  outIp.fromString("192.168.0.0");
+  playHapticRT(0.0);
+  Serial.println("distant Host disconnected");
+}
 
 void setMode(uint8_t mode) {
   if (mode == motorCurrentMode) {

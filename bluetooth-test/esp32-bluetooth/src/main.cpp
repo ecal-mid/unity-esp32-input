@@ -21,6 +21,8 @@ MotorState motorState = MotorState();
 
 long lastInput = 0;
 int inputSleepTimeoutSeconds = 60 * 5;
+int batterySendInterval = 5000;
+int lastBatteryUpdateTime = 0;
 
 void setup()
 {
@@ -61,11 +63,15 @@ void loop()
     lastInput = millis();
     log_i("encoder: %d", encoderState.count);
   }
-  int batteryLevel = round(batteryState.level * 100);
-  if (setCharacteristicValueIfChanged(*batteryService->batteryLevelCharacteristic, batteryLevel))
-    log_i("battery level: %d%%", batteryLevel);
 
-  delay(10);
+  if (lastBatteryUpdateTime == 0 || millis() - lastBatteryUpdateTime > batterySendInterval)
+  {
+    int batteryLevel = round(batteryState.level * 100);
+    if (setCharacteristicValueIfChanged(*batteryService->batteryLevelCharacteristic, batteryLevel))
+      log_i("battery level: %d%%", batteryLevel);
+
+    lastBatteryUpdateTime = millis();
+  }
 
   if (millis() - lastInput > inputSleepTimeoutSeconds * 1000)
   {
@@ -77,4 +83,6 @@ void loop()
     esp_sleep_enable_ext0_wakeup(buttonState.pin, 0);
     esp_deep_sleep_start();
   }
+
+  delay(10);
 }

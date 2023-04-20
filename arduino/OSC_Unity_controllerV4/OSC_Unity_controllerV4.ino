@@ -62,6 +62,9 @@ bool clientConnected = false;
 /* ------- Adafruit_DRV2605 */
 Adafruit_DRV2605 drv;
 int8_t motorCurrentMode;
+
+
+// define capabilities here
 uint8_t motorCount = 2;
 uint8_t encoderCount = 0;
 uint8_t buttonCount = 0;
@@ -79,12 +82,14 @@ void setup() {
   if (motorCount > 0) {
 
     // DRV2605
+    // TODO init all motors
     Serial.println("Starting DRV2605");
     if (drv.begin()) {
       Serial.println("has DRV2065");
       drv.selectLibrary(1);
       drv.useERM();  // ERM or LRA
       stopMotors();  // Stop the motor in case it hang running
+
     } else {
       motorCount = 0;
       Serial.println("no DRV2065");
@@ -140,8 +145,7 @@ void loop() {
 
   /* --------- SEND OSC MSGS */
 
-  if(encoderCount > 0)
-  {      
+  if (encoderCount > 0) {
     // ENCODER
     // read the state of the Encoder
     encoderValue = encoder.getCount();
@@ -153,8 +157,7 @@ void loop() {
     }
   }
 
-  if(buttonCount > 0)
-  {   
+  if (buttonCount > 0) {
     // BUTTON
     // read the state of the pushbutton value:
     buttonState = digitalRead(buttonPin) ? 0 : 1;
@@ -193,8 +196,7 @@ void loop() {
     if (!msg.hasError()) {
       if (authorisedIP == true) {
         // access only if authorised IP
-        if(motorCount > 0)
-        {          
+        if (motorCount > 0) {
           msg.dispatch("/arduino/motor/rt", inMotorRealtime);
           msg.dispatch("/arduino/motor/cmd", inMotorCommand);
           msg.dispatch("/arduino/motor/stopall", inMotorStopAll);
@@ -284,7 +286,7 @@ void outSendAlive(int msg_id) {
 void inMotorRealtime(OSCMessage &msg) {  // int value 0-100
 
   int motorId = msg.getInt(0);
-  if(motorId >= motorCount)
+  if (motorId >= motorCount)
     return;
   int motorValue = msg.getInt(1);
   Serial.printf("/arduino/motor/rt: %i %i\n", motorId, motorValue);
@@ -294,7 +296,7 @@ void inMotorRealtime(OSCMessage &msg) {  // int value 0-100
 
 void inMotorCommand(OSCMessage &msg) {  // int value 0-117
   int motorId = msg.getInt(0);
-  if(motorId >= motorCount)
+  if (motorId >= motorCount)
     return;
   int motorCommand = msg.getInt(1);
   Serial.printf("/arduino/motor/cmd: %i %i\n", motorId, motorCommand);
@@ -442,16 +444,17 @@ void setMode(uint8_t mode) {
   motorCurrentMode = mode;
 }
 void playHaptic(uint8_t motorId, uint8_t effect) {
+
+  // TODO check motorId
   setMode(DRV2605_MODE_INTTRIG);
 
   drv.setWaveform(0, effect);  // play effect
   drv.setWaveform(1, 0);       // end waveform
   drv.go();
-  //delay(200);
 }
 void playHapticRT(uint8_t motorId, double val) {  // 0 - 1
 
-  // TODO CHECK motorId
+  // TODO check motorId
   setMode(DRV2605_MODE_REALTIME);
 
   int intV = min(1.0, max(0.0, val)) * 0x7F;
@@ -461,15 +464,14 @@ void playHapticRT(uint8_t motorId, double val) {  // 0 - 1
 
 void stopMotors() {
 
-  if(motorCount == 0)
-    return;
-
-  playHapticRT(0, 0.0);  // TODO for all motors
+  for (int i = 0; i < motorCount; i++) {
+    playHapticRT(0, 0.0);
+  }
 }
 
-void resetEncoders(){
+void resetEncoders() {
 
-  if(encoderCount == 0)
+  if (encoderCount == 0)
     return;
 
   encoder.setCount(0);  // reset the counter

@@ -69,16 +69,19 @@ public class Esp32InputDevice : InputDevice//, IInputStateCallbackReceiver
         return false;
     }*/
 
-    public void SendMotorSpeed(float speed)
+    public void SendMotorSpeed(float speed) => SendMotorSpeed(0, speed);
+
+    public void SendMotorSpeed(int motorId, float speed)
     {
-        var cmd = Esp32HapticRealtimeCommand.Create(speed);
+        var cmd = Esp32HapticRealtimeCommand.Create(motorId,speed);
         ExecuteCommand(ref cmd);
     }
 
 
-    public void SendHapticEvent(int eventId)
+    public void SendHapticEvent(int eventId) => SendHapticEvent(0, eventId);
+    public void SendHapticEvent(int motorId, int eventId)
     {
-        var cmd = Esp32HapticEventCommand.Create(eventId);
+        var cmd = Esp32HapticEventCommand.Create(motorId,eventId);
         ExecuteCommand(ref cmd);
     }
 }

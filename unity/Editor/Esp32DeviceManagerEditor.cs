@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -6,8 +7,8 @@ using UnityEngine;
 [CanEditMultipleObjects]
 public class Esp32DeviceManagerEditor : Editor
 {
-	private int hapticEvent;
-	private float motorSpeed;
+	List<int> hapticEvent = new List<int>();
+	List<float> motorSpeed = new List<float>();
 	ESP32Device activeDevice;
 
 	public override bool RequiresConstantRepaint()
@@ -55,7 +56,7 @@ public class Esp32DeviceManagerEditor : Editor
 			EditorGUILayout.Space();
 			EditorGUILayout.LabelField("", "Client Connection", EditorStyles.boldLabel);
 			EditorGUILayout.LabelField("IP Address", activeDevice.sender.address);
-			EditorGUILayout.LabelField("RTT", $"{activeDevice.lastHeartbeatRTT*1000:0.0}ms");
+			EditorGUILayout.LabelField("RTT", $"{activeDevice.lastHeartbeatRTT * 1000:0.0}ms");
 
 			GUILayout.BeginHorizontal();
 			EditorGUILayout.PrefixLabel("State");
@@ -109,48 +110,73 @@ public class Esp32DeviceManagerEditor : Editor
 				}
 				GUILayout.EndHorizontal();
 
-				EditorGUILayout.LabelField("Has Motor", $"{activeDevice.deviceInfo.hasMotor}");
-
-
-				EditorGUILayout.Space();
-				EditorGUILayout.LabelField("", "Input", EditorStyles.boldLabel);
-				EditorGUILayout.LabelField("Button:", activeDevice.currentState.button ? "down" : "up", EditorStyles.boldLabel);
-				EditorGUILayout.LabelField("Encoder Value:", activeDevice.currentState.encoder.ToString(), EditorStyles.boldLabel);
+				EditorGUILayout.LabelField("Capabilities",
+					$"Motors: {activeDevice.deviceInfo.motorCount} Encoders: {activeDevice.deviceInfo.encoderCount} Buttons: {activeDevice.deviceInfo.buttonCount}");
 				GUILayout.BeginHorizontal();
-				EditorGUILayout.PrefixLabel("Time since last event");
+				EditorGUILayout.PrefixLabel("Time since last event or heartbeat");
 				EditorGUILayout.LabelField(activeDevice.timeSinceLastEvent >= 0 ? $"{activeDevice.timeSinceLastEvent:0.0}s" : "no events received");
 				GUILayout.EndHorizontal();
+
 				EditorGUILayout.Space();
-
-				EditorGUILayout.LabelField("", "Output", EditorStyles.boldLabel);
-				hapticEvent = EditorGUILayout.IntSlider("Haptic Event", hapticEvent, 0, 123);
-
-				GUILayout.BeginHorizontal();
-				EditorGUILayout.PrefixLabel(" ");
-				if (GUILayout.Button("Send Haptic Event"))
+				if (activeDevice.deviceInfo.buttonCount > 0 ||
+				    activeDevice.deviceInfo.encoderCount > 0)
 				{
-					activeDevice.SendHapticEvent(hapticEvent);
+					EditorGUILayout.LabelField("", "Input", EditorStyles.boldLabel);
+					if (activeDevice.deviceInfo.buttonCount > 0)
+						EditorGUILayout.LabelField("Button:", activeDevice.currentButtonState.button ? "down" : "up", EditorStyles.boldLabel);
+					if (activeDevice.deviceInfo.encoderCount > 0)
+						EditorGUILayout.LabelField("Encoder Value:", activeDevice.currentEncoderState.encoder.ToString(), EditorStyles.boldLabel);
+					EditorGUILayout.Space();
 				}
 
-				GUILayout.EndHorizontal();
-
-				var newMotorSpeed = EditorGUILayout.Slider("Motor Speed", motorSpeed, 0f, 1f);
-
-				if (Math.Abs(motorSpeed - newMotorSpeed) > 0.00001f)
+				if (activeDevice.deviceInfo.motorCount > 0)
 				{
-					activeDevice.SendMotorSpeed(motorSpeed);
-					motorSpeed = newMotorSpeed;
-				}
+					EditorGUILayout.LabelField("", "Output", EditorStyles.boldLabel);
+					while(hapticEvent.Count < activeDevice.deviceInfo.motorCount)
+						hapticEvent.Add(0);
+					while(motorSpeed.Count < activeDevice.deviceInfo.motorCount)
+						motorSpeed.Add(0);
 
-				GUILayout.BeginHorizontal();
-				EditorGUILayout.PrefixLabel(" ");
-				if (GUILayout.Button("Stop Motor"))
-				{
-					activeDevice.SendMotorSpeed(0);
-					motorSpeed = 0;
-				}
+					EditorGUILayout.LabelField("", "Motor", EditorStyles.boldLabel);
+					for (int i = 0; i < activeDevice.deviceInfo.motorCount; i++)
+					{
+						GUILayout.BeginHorizontal();
+						EditorGUILayout.PrefixLabel("Haptic Event");
+						hapticEvent[i] = EditorGUILayout.IntSlider(hapticEvent[i] , 0, 123);
+						if (GUILayout.Button("Send", GUILayout.Width(80)))
+						{
+							activeDevice.SendHapticEvent(i, hapticEvent[i] );
+						}
 
-				GUILayout.EndHorizontal();
+						GUILayout.EndHorizontal();
+
+						GUILayout.BeginHorizontal();
+						EditorGUILayout.PrefixLabel("Motor Speed");
+						var newMotorSpeed = EditorGUILayout.Slider( motorSpeed[i], 0f, 1f);
+
+						if (Math.Abs(motorSpeed[i] - newMotorSpeed) > 0.00001f)
+						{
+							activeDevice.SendMotorSpeed(i, motorSpeed[i]);
+							motorSpeed[i] = newMotorSpeed;
+						}
+						if (GUILayout.Button("Stop", GUILayout.Width(80)))
+						{
+							activeDevice.SendMotorSpeed(i, 0);
+							motorSpeed[i] = 0;
+						}
+						GUILayout.EndHorizontal();
+					}
+
+					GUILayout.BeginHorizontal();
+					EditorGUILayout.PrefixLabel(" ");
+					if (GUILayout.Button("Stop all motors"))
+					{
+						activeDevice.StopMotors();
+						motorSpeed.Clear();
+					}
+
+					GUILayout.EndHorizontal();
+				}
 
 				EditorGUILayout.LabelField("", "Device", EditorStyles.boldLabel);
 				GUILayout.BeginHorizontal();

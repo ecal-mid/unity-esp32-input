@@ -108,15 +108,6 @@ public struct Esp32DeviceState : IInputStateTypeInfo
     {
         return $"{nameof(encoder)}: {encoder}, {nameof(button)}: {button}";
     }
-    
-	public static implicit operator Esp32DeviceState(ESP32InputState state)
-    {
-        return new Esp32DeviceState
-        {
-            button = state.button,
-            encoder = state.encoder
-        };
-    }
 }
 
 #endif

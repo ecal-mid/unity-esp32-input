@@ -4,10 +4,12 @@ public struct ESP32DeviceInfo
 	public int firmwareVersion;
 	public float batteryVoltage;
 	public float batteryLevel;
-	public bool hasMotor;
+	public int motorCount;
+	public int encoderCount;
+	public int buttonCount;
 
 	public override string ToString()
 	{
-		return $"{nameof(name)}: {name}, {nameof(firmwareVersion)}: {firmwareVersion}, {nameof(batteryLevel)}: {batteryLevel}, {nameof(hasMotor)}: {hasMotor}";
+		return $"{nameof(name)}: {name}, {nameof(firmwareVersion)}: {firmwareVersion}, {nameof(batteryLevel)}: {batteryLevel}, {nameof(motorCount)}: {motorCount}, {nameof(encoderCount)}: {encoderCount}, {nameof(buttonCount)}: {buttonCount}";
 	}
 }

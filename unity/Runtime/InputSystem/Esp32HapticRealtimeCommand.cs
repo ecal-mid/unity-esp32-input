@@ -7,7 +7,7 @@ using UnityEngine.InputSystem.Utilities;
 [StructLayout(LayoutKind.Explicit, Size = kSize)]
 internal struct Esp32HapticRealtimeCommand : IInputDeviceCommandInfo
 {
-    public static FourCC Type { get { return new FourCC('H', 'P', 'T', 'R'); } }
+    public static FourCC Type => new('H', 'P', 'T', 'R');
 
     internal const int kSize = InputDeviceCommand.BaseCommandSize + sizeof(int);
 
@@ -15,19 +15,20 @@ internal struct Esp32HapticRealtimeCommand : IInputDeviceCommandInfo
     public InputDeviceCommand baseCommand;
 
     [FieldOffset(InputDeviceCommand.BaseCommandSize)]
+    public int motorId;
+
+    [FieldOffset(sizeof(int))]
     public float speed;
 
-    public FourCC typeStatic
-    {
-        get { return Type; }
-    }
+    public FourCC typeStatic => Type;
 
-    public static Esp32HapticRealtimeCommand Create(float speed)
+    public static Esp32HapticRealtimeCommand Create(int motorId, float speed)
     {
         return new Esp32HapticRealtimeCommand
         {
             baseCommand = new InputDeviceCommand(Type, kSize),
-            speed = speed
+            speed = speed,
+            motorId = motorId
         };
     }
 }

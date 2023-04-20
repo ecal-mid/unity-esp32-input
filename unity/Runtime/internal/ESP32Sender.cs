@@ -38,14 +38,18 @@ public class ESP32Sender : IDisposable
 		oscClient.Send("/arduino/disconnect");
 	}
 
-	public void SendMotorSpeed(float speed)
+	public void SendMotorSpeed(int motorId, float speed)
 	{
-		oscClient.Send("/arduino/motor/rt", Mathf.RoundToInt(speed * 100));
+		oscClient.Send("/arduino/motor/rt", motorId, Mathf.RoundToInt(speed * 100));
+	}
+	public void StopMotors()
+	{
+		oscClient.Send("/arduino/motor/stopall");
 	}
 
-	public void SendHapticEvent(int hapticEventId)
+	public void SendHapticEvent(int motorId,int hapticEventId)
 	{
-		oscClient.Send("/arduino/motor/cmd", hapticEventId);
+		oscClient.Send("/arduino/motor/cmd", motorId, hapticEventId);
 	}
 
 	public void SendReboot()

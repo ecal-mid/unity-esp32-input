@@ -12,7 +12,7 @@ public class ESP32Device : IDisposable
 		Connected
 	}
 
-	public event Action<ESP32Device, ESP32InputState> OnInputReceived;
+	public event Action<ESP32Device> OnInputReceived;
 	public event Action<ESP32Device> OnConnected;
 	public event Action<ESP32Device> OnDisconnected;
 	public float connectionStateTime { get; private set; } = 0;
@@ -21,8 +21,9 @@ public class ESP32Device : IDisposable
 	public bool autoConnectInBuild { get; private set; } = false;
 
 	public ESP32DeviceInfo deviceInfo { get; private set; }
-	public ESP32InputState currentState { get; private set; }
-
+	public ESP32ButtonInputState currentButtonState { get; private set; }
+	public ESP32EncoderInputState currentEncoderState { get; private set; }
+	
 	int heartbeatMsgId;
 	float heartbeatSendTime;
 	float heartbeatReceiveTime;
@@ -55,7 +56,8 @@ public class ESP32Device : IDisposable
 
 		receiver = espReceiver;
 		receiver.OnInfo += OnInfo;
-		receiver.OnInput += OnInput;
+		receiver.OnEncoderInput += OnEncoderInput;
+		receiver.OnButtonInput += OnButtonInput;
 		receiver.OnDisconnect += OnDisconnect;
 		receiver.OnAlive += OnAlive;
 	}
@@ -74,7 +76,8 @@ public class ESP32Device : IDisposable
 		if (receiver != null)
 		{
 			receiver.OnInfo -= OnInfo;
-			receiver.OnInput -= OnInput;
+			receiver.OnEncoderInput -= OnEncoderInput;
+			receiver.OnButtonInput -= OnButtonInput;
 			receiver.OnDisconnect -= OnDisconnect;
 			receiver.OnAlive -= OnAlive;
 			receiver = null;
@@ -131,7 +134,7 @@ public class ESP32Device : IDisposable
 		}
 	}
 
-	public void OnInput(ESP32Event<ESP32InputState> evt)
+	public void OnButtonInput(ESP32Event<ESP32ButtonInputState> evt)
 	{
 		if (evt.senderAddress != sender.address)
 			return;
@@ -140,11 +143,28 @@ public class ESP32Device : IDisposable
 		{
 			var state = evt.data;
 
-			currentState = state;
+			currentButtonState = state;
 
 			timeSinceLastEvent = 0;
 
-			OnInputReceived?.Invoke(this, evt.data);
+			OnInputReceived?.Invoke(this);
+		}
+	}
+
+	public void OnEncoderInput(ESP32Event<ESP32EncoderInputState> evt)
+	{
+		if (evt.senderAddress != sender.address)
+			return;
+
+		if (connectionState == ConnectionState.Connected)
+		{
+			var state = evt.data;
+			
+			currentEncoderState = state;
+
+			timeSinceLastEvent = 0;
+
+			OnInputReceived?.Invoke(this);
 		}
 	}
 
@@ -200,16 +220,24 @@ public class ESP32Device : IDisposable
 	}
 
 
-	public void SendMotorSpeed(float speed)
+	public void StopMotors()
 	{
 		if (connectionState == ConnectionState.Connected)
-			sender.SendMotorSpeed(speed);
+			sender.StopMotors();
+	}
+	
+	public void SendMotorSpeed(int motorId, float speed)
+	{
+		if (connectionState == ConnectionState.Connected)
+		{
+			sender.SendMotorSpeed(motorId, speed);
+		}
 	}
 
-	public void SendHapticEvent(int hapticEventId)
+	public void SendHapticEvent(int motorId, int hapticEventId)
 	{
 		if (connectionState == ConnectionState.Connected)
-			sender.SendHapticEvent(hapticEventId);
+			sender.SendHapticEvent(motorId,hapticEventId);
 	}
 
 	public void Connect()
@@ -273,11 +301,8 @@ public class ESP32Device : IDisposable
 				heartbeatState = HeartbeatState.Idle;
 				failedHeartbeats = 0;
 				lastHeartbeatRTT = 0;
-				currentState = new ESP32InputState
-				{
-					button = false,
-					encoder = 0
-				};
+				currentButtonState = default;
+				currentEncoderState = default;
 				break;
 			case ConnectionState.Connected:
 				OnConnected?.Invoke(this);

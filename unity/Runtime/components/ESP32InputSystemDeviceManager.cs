@@ -71,9 +71,13 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 		inputDevices.Remove(device);
 	}
 
-	void OnInputReceived(ESP32Device device, ESP32InputState inputState)
-	{
-		InputSystem.QueueStateEvent<Esp32DeviceState>(inputDevices[device], inputState);
+	void OnInputReceived(ESP32Device device)
+	{ 
+		InputSystem.QueueStateEvent(inputDevices[device], new Esp32DeviceState
+		{
+			button = device.currentButtonState.button,
+			encoder = device.currentEncoderState.encoder
+		});
 	}
 
 	unsafe void AddCommandListener()
@@ -96,14 +100,14 @@ public class ESP32InputSystemDeviceManager : MonoBehaviour
 				if (command->type == Esp32HapticEventCommand.Type)
 				{
 					var cmd = (Esp32HapticEventCommand*)command;
-					mainDevice.SendHapticEvent(cmd->eventId);
+					mainDevice.SendHapticEvent(cmd->motorId, cmd->eventId);
 					return 0;
 				}
 
 				if (command->type == Esp32HapticRealtimeCommand.Type)
 				{
 					var cmd = (Esp32HapticRealtimeCommand*)command;
-					mainDevice.SendMotorSpeed(cmd->speed);
+					mainDevice.SendMotorSpeed(cmd->motorId, cmd->speed);
 					return 0;
 				}
 			}

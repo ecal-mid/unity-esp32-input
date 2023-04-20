@@ -31,6 +31,8 @@ public class ESP32Device : IDisposable
 	int maxFailedHeartbeatsForDisconnect = 3;
 	public float lastHeartbeatRTT { get; private set; }
 
+	const int minFirmwareVersion = 38;
+
 	enum HeartbeatState
 	{
 		Idle,
@@ -191,6 +193,11 @@ public class ESP32Device : IDisposable
 		{
 			deviceInfo = evt.data;
 			timeSinceLastEvent = 0;
+			if (deviceInfo.firmwareVersion < minFirmwareVersion)
+			{
+				Debug.LogError($"Connection failed, minimum required firmware version is {minFirmwareVersion} (device firmware version: {deviceInfo.firmwareVersion})");
+				Disconnect();
+			}
 		}
 	}
 

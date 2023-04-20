@@ -20,7 +20,7 @@
 #include <ESP32Encoder.h>
 #include <Preferences.h>
 
-int firmware = 37;
+int firmware = 38;
 
 char ssid[] = WIFI_SSID;  // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;

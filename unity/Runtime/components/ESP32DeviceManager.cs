@@ -16,6 +16,8 @@ public class ESP32DeviceManager : MonoBehaviour
 
 	public event Action<ESP32Device> OnConnected;
 	public event Action<ESP32Device> OnDisconnected;
+	public event Action<ESP32Device> OnDeviceAdded;
+	public event Action<ESP32Device> OnDeviceRemoved;
 
 	State state = State.NotStarted;
 
@@ -76,7 +78,7 @@ public class ESP32DeviceManager : MonoBehaviour
 		if (state != State.NotStarted)
 			return;
 
-		if (!settings)
+		if (settings == null)
 			return;
 
 		try
@@ -155,6 +157,7 @@ public class ESP32DeviceManager : MonoBehaviour
 		device.OnConnected += OnDeviceConnected;
 		device.OnDisconnected += OnDeviceDisconnected;
 		devices.Add(device);
+		OnDeviceAdded?.Invoke(device);
 	}
 
 	void RemoveDevice(ESP32Device device)
@@ -163,6 +166,7 @@ public class ESP32DeviceManager : MonoBehaviour
 		device.OnConnected -= OnDeviceConnected;
 		device.OnDisconnected -= OnDeviceDisconnected;
 		devices.Remove(device);
+		OnDeviceRemoved?.Invoke(device);
 	}
 
 	void OnDeviceConnected(ESP32Device device)

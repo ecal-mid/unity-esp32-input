@@ -5,6 +5,7 @@ using UnityEngine;
 
 
 [DefaultExecutionOrder(-20)]
+[ExecuteAlways]
 public class ESP32DeviceListFromURL : MonoBehaviour
 {
 	[Serializable]
@@ -51,8 +52,7 @@ public class ESP32DeviceListFromURL : MonoBehaviour
 				{
 					name = name,
 					address = list.data[i].ip,
-					port = 9999,
-					autoConnectInBuild = prevItem != -1 ? deviceManager.settings.clients[prevItem].autoConnectInBuild : false
+					port = 9999
 				});
 			}
 

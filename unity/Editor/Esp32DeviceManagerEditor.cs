@@ -156,7 +156,7 @@ public class Esp32DeviceManagerEditor : Editor
 
 						if (Math.Abs(motorSpeed[i] - newMotorSpeed) > 0.00001f)
 						{
-							activeDevice.SendMotorSpeed(i, motorSpeed[i]);
+							activeDevice.SendMotorSpeed(i, newMotorSpeed);
 							motorSpeed[i] = newMotorSpeed;
 						}
 						if (GUILayout.Button("Stop", GUILayout.Width(80)))

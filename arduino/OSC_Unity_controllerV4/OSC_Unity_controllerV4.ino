@@ -3,10 +3,13 @@
   Controller for Unity
   Communication via OSC
 
-  V4 AB/ECAL 2022
-
+  V4 AB/ECAL 2023
+  Update for using with ESP32 S2 (Adafruit QT PY ESP32 S2)
 
   --------------------------------------------------------------------------------------------- */
+#define ESP_32_FEATHER // uncomment if ESP32 FEATHER
+//#define ESP_32_S2  // uncomment if ESP32 S2
+// includes
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <HTTPClient.h>
@@ -17,10 +20,27 @@
 #include "your_secrets.h"
 #include <Wire.h>
 #include "Adafruit_DRV2605.h"
+#ifdef ESP_32_FEATHER
 #include <ESP32Encoder.h>
+#endif
 #include <Preferences.h>
 
-int firmware = 38;
+int firmware = 39;
+
+// BOARD DEPENDENT CONSTANTS
+#ifdef ESP_32_S2
+#define PIN_BUTTON 0
+#define PIN_BATTERY A2
+#define WAKEUP_PIN GPIO_NUM_0
+#define WIRE_INSTANCE &Wire1
+#endif
+
+#ifdef ESP_32_FEATHER
+#define PIN_BUTTON 27
+#define PIN_BATTERY A13
+#define WAKEUP_PIN GPIO_NUM_27
+#define WIRE_INSTANCE &Wire
+#endif
 
 char ssid[] = WIFI_SSID;  // edit WIFI_SSID + WIFI_PASS constants in the your_secret.h tab (if not present create it)
 char pass[] = WIFI_PASS;
@@ -41,17 +61,20 @@ float batteryVotage = 0;
 
 /* ------- Define pins ann vars for button + encoder */
 // Button
-const int buttonPin = 27;
+const int buttonPin = PIN_BUTTON;
 int buttonState = 0;
 int buttonLastState = -1;
 unsigned long lastButtonUpMillis = -1;
 
 // Encoder
+#ifdef ESP_32_FEATHER
 ESP32Encoder encoder;
 const int encoder_pin_1 = 13;
 const int encoder_pin_2 = 15;
 int32_t encoderPrevValue = -9999;
+#endif
 int32_t encoderValue;
+
 // Timing
 unsigned long lastUserInteractionMillis = 0;
 int sleepDelayInMillis = 1 * 60 * 1000;  // time in milliseconds to wait before standby
@@ -65,9 +88,9 @@ int8_t motorCurrentMode;
 
 
 // define capabilities here
-uint8_t motorCount = 2;
+uint8_t motorCount = 1;
 uint8_t encoderCount = 0;
-uint8_t buttonCount = 0;
+uint8_t buttonCount = 1;
 
 /* Server for IP table update */
 HTTPClient httpclient;
@@ -79,17 +102,17 @@ void setup() {
   Serial.println("");
   preferences.begin("device", false);
   //setBoardName(1);
-  if (motorCount > 0) {
 
+  if (motorCount > 0) {
     // DRV2605
     // TODO init all motors
     Serial.println("Starting DRV2605");
-    if (drv.begin()) {
+
+    if (drv.begin(WIRE_INSTANCE)) {
       Serial.println("has DRV2065");
       drv.selectLibrary(1);
       drv.useERM();  // ERM or LRA
       stopMotors();  // Stop the motor in case it hang running
-
     } else {
       motorCount = 0;
       Serial.println("no DRV2065");
@@ -100,13 +123,16 @@ void setup() {
     pinMode(buttonPin, INPUT_PULLUP);
   }
 
+#ifdef ESP_32_FEATHER
+  // ENCODER
   if (encoderCount > 0) {
-    // ENCODER
     ESP32Encoder::useInternalWeakPullResistors = UP;
     encoder.attachHalfQuad(encoder_pin_1, encoder_pin_2);
     encoder.setFilter(1023);
     encoder.setCount(0);  // reset the counter
   }
+#endif
+
   // Start Wifi and UDP
   startWifiAndUdp();
 
@@ -144,7 +170,7 @@ void loop() {
   }
 
   /* --------- SEND OSC MSGS */
-
+#ifdef ESP_32_FEATHER
   if (encoderCount > 0) {
     // ENCODER
     // read the state of the Encoder
@@ -156,6 +182,7 @@ void loop() {
       keepAlive(0);  // reset countdown for deepsleep
     }
   }
+#endif
 
   if (buttonCount > 0) {
     // BUTTON
@@ -183,11 +210,11 @@ void loop() {
   if (size > 0) {
     // check if the message come from the same Out IP to avoid multiple connections
     if (Udp.remoteIP().toString() != outIp.toString()) {
-      //Serial.print("NOT allowed senders IP: ");
-      //Serial.println(Udp.remoteIP());
+      Serial.print("NOT allowed senders IP: ");
+      Serial.println(Udp.remoteIP());
       authorisedIP = false;
     } else {
-      Serial.println("allowed senders IP ");
+      //Serial.println("allowed senders IP ");
       authorisedIP = true;
     }
     while (size--) {
@@ -231,6 +258,7 @@ void outSendButtonValues() {  // in button, encoder
   msg.empty();
   Serial.printf("send button state: %i\n", buttonState);
 }
+
 void outSendEncoderValues() {  // in button, encoder
   OSCMessage msg("/unity/state/encoder/");
   msg.add(ipAsChar);
@@ -292,6 +320,7 @@ void inMotorRealtime(OSCMessage &msg) {  // int value 0-100
   Serial.printf("/arduino/motor/rt: %i %i\n", motorId, motorValue);
   double motorInput = (float)motorValue / 100;
   playHapticRT(motorId, motorInput);
+  keepAlive(0);
 }
 
 void inMotorCommand(OSCMessage &msg) {  // int value 0-117
@@ -301,6 +330,7 @@ void inMotorCommand(OSCMessage &msg) {  // int value 0-117
   int motorCommand = msg.getInt(1);
   Serial.printf("/arduino/motor/cmd: %i %i\n", motorId, motorCommand);
   playHaptic(motorId, motorCommand);
+  keepAlive(0);
 }
 
 void inMotorStopAll(OSCMessage &msg) {
@@ -416,7 +446,12 @@ void setBoardName(int nbr) {
 
 String getBoardName() {
   int nbr = preferences.getInt("name", 0);
+#ifdef ESP_32_FEATHER
   String board_name = "controller" + String(nbr);
+#endif
+#ifdef ESP_32_S2
+  String board_name = "hapticband" + String(nbr);
+#endif
   return board_name;
 }
 
@@ -424,8 +459,15 @@ float getBatteryLevel() {
   // Reference voltage on ESP32 is 1.1V
   // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html#adc-calibration
   // See also: https://bit.ly/2zFzfMT
-  int rawValue = analogRead(A13);
+
+  int rawValue = analogRead(PIN_BATTERY);
+#ifdef ESP_32_S2
+  float voltageLevel = rawValue / (6000 / 4.1);  // calculate voltage level (hand calibrated)
+#endif
+#ifdef ESP_32_FEATHER
   float voltageLevel = (rawValue / 4096.0) * 2 * 1.1 * 3.3;  // calculate voltage level
+#endif
+
   return (voltageLevel);
 }
 
@@ -470,11 +512,12 @@ void stopMotors() {
 }
 
 void resetEncoders() {
-
   if (encoderCount == 0)
     return;
 
+#ifdef ESP_32_FEATHER
   encoder.setCount(0);  // reset the counter
+#endif
 }
 
 void keepAlive(int sleepdelay) {  // send value in minutes, if 0 no update of active value
@@ -487,16 +530,28 @@ void keepAlive(int sleepdelay) {  // send value in minutes, if 0 no update of ac
 }
 
 void goToSleep(int force) {
+#ifdef ESP_32_FEATHER
   if (getBatteryLevel() > 4.2 && force != 1) {  // fully charged or plugged to a charger so no need to sleep
     keepAlive(0);
     return;
   }
+#endif
+#ifdef ESP_32_S2
+  if (getBatteryLevel() > 4.0 && force != 1) {  // fully charged or plugged to a charger so no need to sleep
+    keepAlive(0);
+    return;
+  }
+#endif
+
   Serial.println("************* going to sleep, bye! *************");
   outSendDisconnect();
   stopMotors();  // Stop the motor in case it hang running
+#ifdef ESP_32_FEATHER
   pinMode(encoder_pin_1, OUTPUT);
   digitalWrite(encoder_pin_1, LOW);  // turn of the led
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_27, 0);
+#endif
+
+  esp_sleep_enable_ext0_wakeup(WAKEUP_PIN, 0);
   esp_deep_sleep_start();
 }
 
@@ -519,8 +574,10 @@ void updateIpTable() {
 void restartESP() {
   stopMotors();  // Stop the motor in case it hang running
   outSendDisconnect();
+#ifdef ESP_32_FEATHER
   pinMode(encoder_pin_1, OUTPUT);
   digitalWrite(encoder_pin_1, LOW);  // turn of the led
+#endif
   Serial.print("Restarting now");
   delay(10);
   ESP.restart();

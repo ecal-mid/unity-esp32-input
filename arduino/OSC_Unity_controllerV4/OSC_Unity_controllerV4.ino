@@ -7,8 +7,8 @@
   Update for using with ESP32 S2 (Adafruit QT PY ESP32 S2)
 
   --------------------------------------------------------------------------------------------- */
-#define ESP_32_FEATHER // uncomment if ESP32 FEATHER
-//#define ESP_32_S2  // uncomment if ESP32 S2
+//#define ESP_32_FEATHER  // uncomment if ESP32 FEATHER
+#define ESP_32_S2  // uncomment if ESP32 S2
 // includes
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -25,18 +25,20 @@
 #endif
 #include <Preferences.h>
 
-int firmware = 39;
+int firmware = 40;
 
 // BOARD DEPENDENT CONSTANTS
 #ifdef ESP_32_S2
 #define PIN_BUTTON 0
 #define PIN_BATTERY A2
+#define MOTOR_PIN A3
 #define WAKEUP_PIN GPIO_NUM_0
 #define WIRE_INSTANCE &Wire1
 #endif
 
 #ifdef ESP_32_FEATHER
 #define PIN_BUTTON 27
+#define MOTOR_PIN AA
 #define PIN_BATTERY A13
 #define WAKEUP_PIN GPIO_NUM_27
 #define WIRE_INSTANCE &Wire
@@ -82,14 +84,19 @@ unsigned long lastInfoSentMillis = 0;
 unsigned long lastKeepAliveReceived = 0;
 bool clientConnected = false;
 
+// normal motor PWM
+const int freq = 1000;
+const int pwmChannel = 0;
+const int resolution = 8;
+
 /* ------- Adafruit_DRV2605 */
 Adafruit_DRV2605 drv;
 int8_t motorCurrentMode;
 
 
 // define capabilities here
-uint8_t motorCount = 1;
-uint8_t encoderCount = 0;
+uint8_t motorCount = 2;
+uint8_t encoderCount = 1;
 uint8_t buttonCount = 1;
 
 /* Server for IP table update */
@@ -101,7 +108,7 @@ void setup() {
   delay(1000);
   Serial.println("");
   preferences.begin("device", false);
-  //setBoardName(1);
+  //setBoardName(2);
 
   if (motorCount > 0) {
     // DRV2605
@@ -116,6 +123,14 @@ void setup() {
     } else {
       motorCount = 0;
       Serial.println("no DRV2065");
+    }
+
+    if (motorCount == 2) {
+      pinMode(MOTOR_PIN, OUTPUT);
+      // configure MOTOR PWM functionalitites
+      ledcSetup(pwmChannel, freq, resolution);
+      // attach the channel to the GPIO to be controlled
+      ledcAttachPin(MOTOR_PIN, pwmChannel);
     }
   }
   // BUTTON
@@ -312,13 +327,13 @@ void outSendAlive(int msg_id) {
 /* --------- INCOMMING OSC COMMANDS FUNCTIONS ------------ */
 
 void inMotorRealtime(OSCMessage &msg) {  // int value 0-100
-
   int motorId = msg.getInt(0);
   if (motorId >= motorCount)
     return;
   int motorValue = msg.getInt(1);
   Serial.printf("/arduino/motor/rt: %i %i\n", motorId, motorValue);
   double motorInput = (float)motorValue / 100;
+
   playHapticRT(motorId, motorInput);
   keepAlive(0);
 }
@@ -486,28 +501,31 @@ void setMode(uint8_t mode) {
   motorCurrentMode = mode;
 }
 void playHaptic(uint8_t motorId, uint8_t effect) {
-
-  // TODO check motorId
-  setMode(DRV2605_MODE_INTTRIG);
-
-  drv.setWaveform(0, effect);  // play effect
-  drv.setWaveform(1, 0);       // end waveform
-  drv.go();
+  if (motorId == 0) {
+    // TODO check motorId
+    setMode(DRV2605_MODE_INTTRIG);
+    drv.setWaveform(0, effect);  // play effect
+    drv.setWaveform(1, 0);       // end waveform
+    drv.go();
+  }
 }
 void playHapticRT(uint8_t motorId, double val) {  // 0 - 1
-
-  // TODO check motorId
-  setMode(DRV2605_MODE_REALTIME);
-
-  int intV = min(1.0, max(0.0, val)) * 0x7F;
-  //Serial.println(intV);
-  drv.setRealtimeValue(intV);
+  if (motorId == 0) {
+    setMode(DRV2605_MODE_REALTIME);
+    int intV = min(1.0, max(0.0, val)) * 0x7F;
+    //Serial.println(intV);
+    drv.setRealtimeValue(intV);
+  }
+  if (motorId == 1) {
+    //playNormalMotor((int)val * 100);
+    ledcWrite(pwmChannel, val * 240);
+  }
 }
 
 void stopMotors() {
 
   for (int i = 0; i < motorCount; i++) {
-    playHapticRT(0, 0.0);
+    playHapticRT(i, 0.0);
   }
 }
 
@@ -576,7 +594,7 @@ void restartESP() {
   outSendDisconnect();
 #ifdef ESP_32_FEATHER
   pinMode(encoder_pin_1, OUTPUT);
-  digitalWrite(encoder_pin_1, LOW);  // turn of the led
+  digitalWrite(encoder_pin_1, LOW);
 #endif
   Serial.print("Restarting now");
   delay(10);
